@@ -56,6 +56,20 @@ public enum OrderStatus {
         return target;
     }
 
+    /**
+     * この状態の受注が在庫を引き当てているか。
+     *
+     * <p>引当は確認時に行い、出荷時に実在庫から落とす。したがって引当を
+     * 抱えているのは確認済と出荷指示済の間だけで、出荷完了後は引当済ではなく
+     * 実在庫が減っている。キャンセル時に引当を解除すべきかの判断もこれで決まる。</p>
+     *
+     * <p>Why not: この判定を在庫側やユースケースに置かない。受注の状態から導かれる
+     * 業務ルールであり、状態機械の外に置くと遷移の追加時に更新が漏れる。</p>
+     */
+    public boolean holdsStockAllocation() {
+        return this == CONFIRMED || this == SHIPPING_INSTRUCTED;
+    }
+
     /** 終端ステータス(以降の遷移が存在しない)か */
     public boolean isTerminal() {
         return ALLOWED_TRANSITIONS.get(this).isEmpty();

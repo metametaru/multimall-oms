@@ -59,6 +59,27 @@ class OrderStatusTest {
     }
 
     @Nested
+    @DisplayName("在庫引当を抱える期間")
+    class 在庫引当を抱える期間 {
+
+        @ParameterizedTest(name = "{0} は在庫を引き当てている")
+        @CsvSource({"CONFIRMED", "SHIPPING_INSTRUCTED"})
+        void 確認済から出荷指示済までは在庫を引き当てている(OrderStatus status) {
+            // 引当は確認時に行う。取込直後(NEW)は内容確認前で、モール側キャンセルや
+            // 不正注文も混じるため、未確認の受注で在庫を押さえない
+            assertThat(status.holdsStockAllocation()).isTrue();
+        }
+
+        @ParameterizedTest(name = "{0} は在庫を引き当てていない")
+        @CsvSource({"NEW", "SHIPPED", "CANCELLED", "RETURNED"})
+        void 確認前と出荷後は在庫を引き当てていない(OrderStatus status) {
+            // 出荷完了後は引当ではなく実在庫が減っている。
+            // ここを引当済のままにすると、出荷した数を二重に確保し続けることになる
+            assertThat(status.holdsStockAllocation()).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("終端ステータス")
     class 終端ステータス {
 
