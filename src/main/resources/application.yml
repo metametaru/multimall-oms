@@ -9,3 +9,13 @@ spring:
     hibernate:
       ddl-auto: validate   # スキーマ管理はFlywayに一本化。JPAには検証のみさせる
     open-in-view: false    # OSIVはN+1の温床になるため最初から無効化
+
+  profiles:
+    # モールAPIのモックを同居させたローカル開発用の既定。本番相当の構成では外す
+    active: mock
+
+minioms:
+  mall:
+    # モックは同一プロセス内で動くため自分自身を指す。実モール接続時はここだけ差し替える
+    mall-a-base-url: http://localhost:${server.port:8080}/mock/mall-a
+    mall-b-base-url: http://localhost:${server.port:8080}/mock/mall-b
