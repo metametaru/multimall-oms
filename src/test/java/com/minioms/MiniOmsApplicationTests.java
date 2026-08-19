@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 /**
  * アプリケーション起動とFlywayマイグレーション適用の疎通確認。
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Import;
  */
 @DisplayName("アプリケーション起動")
 @Import(TestcontainersConfiguration.class)
+@ActiveProfiles("test")
 @SpringBootTest
 class MiniOmsApplicationTests {
 

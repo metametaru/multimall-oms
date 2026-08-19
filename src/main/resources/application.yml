@@ -19,3 +19,8 @@ minioms:
     # モックは同一プロセス内で動くため自分自身を指す。実モール接続時はここだけ差し替える
     mall-a-base-url: http://localhost:${server.port:8080}/mock/mall-a
     mall-b-base-url: http://localhost:${server.port:8080}/mock/mall-b
+  import:
+    # 取りこぼしを防ぐため、実行間隔より長い期間を遡って取得する。
+    # 重複は冪等キーで弾かれるので、重ねる方が安全
+    interval: PT1M
+    lookback: PT1H
