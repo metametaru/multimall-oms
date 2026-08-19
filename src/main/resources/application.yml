@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: mini-oms
+  datasource:
+    url: jdbc:postgresql://localhost:5432/minioms
+    username: minioms
+    password: minioms_local   # ローカル開発専用。本番想定の値は環境変数で注入する方針
+  jpa:
+    hibernate:
+      ddl-auto: validate   # スキーマ管理はFlywayに一本化。JPAには検証のみさせる
+    open-in-view: false    # OSIVはN+1の温床になるため最初から無効化

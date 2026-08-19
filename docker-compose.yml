@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mini-oms-db
+    environment:
+      POSTGRES_DB: minioms
+      POSTGRES_USER: minioms
+      POSTGRES_PASSWORD: minioms_local  # ローカル開発専用。本番想定の値は環境変数で注入する方針
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U minioms -d minioms"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
