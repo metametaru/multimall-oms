@@ -12,7 +12,7 @@ import org.testcontainers.utility.DockerImageName;
  * 「テストは通るが本番で壊れる」事故を招くため(README参照)。
  */
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
     // docker-compose.yml と同じイメージに揃える。ローカルとCIで同一のDB挙動を保証するため
     private static final DockerImageName POSTGRES_IMAGE =
@@ -20,7 +20,7 @@ class TestcontainersConfiguration {
 
     @Bean
     @ServiceConnection
-    PostgreSQLContainer<?> postgresContainer() {
+    public PostgreSQLContainer<?> postgresContainer() {
         return new PostgreSQLContainer<>(POSTGRES_IMAGE);
     }
 }
