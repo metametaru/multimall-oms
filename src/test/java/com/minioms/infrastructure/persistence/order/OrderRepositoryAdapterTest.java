@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,6 +108,35 @@ class OrderRepositoryAdapterTest {
         Order fromMallB = orderRepository.save(importedOrder(new MallOrderKey(mallB, "0001")));
 
         assertThat(fromMallB.id()).isNotNull();
+    }
+
+    @Test
+    void 保存済みの受注はステータスを更新できる() {
+        MallOrderKey key = new MallOrderKey(mallA, "A-20260819-0003");
+        Order saved = orderRepository.save(importedOrder(key));
+
+        Order confirmed = orderRepository.save(saved.confirm());
+        assertThat(confirmed.version()).isGreaterThan(saved.version());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(orderRepository.findByMallOrderKey(key))
+                .get()
+                .extracting(Order::status)
+                .isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void 古いバージョンの受注で更新すると楽観ロックエラーになる() {
+        // 同じ受注を2人のオペレーターが同時に開いた場合、後勝ちで一方の操作が
+        // 消えるのを防ぐ。出荷指示とキャンセルが競合すると実害が大きい
+        MallOrderKey key = new MallOrderKey(mallA, "A-20260819-0004");
+        Order saved = orderRepository.save(importedOrder(key));
+        orderRepository.save(saved.confirm());
+
+        assertThatThrownBy(() -> orderRepository.save(saved.cancel()))
+                .isInstanceOf(OptimisticLockingFailureException.class);
     }
 
     @Test
