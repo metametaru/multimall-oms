@@ -7,6 +7,7 @@ import com.minioms.application.order.OrderLifecycleUseCase;
 import com.minioms.application.order.MallOrderClient;
 import com.minioms.application.order.OrderRepository;
 import com.minioms.application.order.OrderSearchQuery;
+import com.minioms.application.stock.FindStocksUseCase;
 import com.minioms.application.stock.StockAllocationService;
 import com.minioms.application.stock.StockRepository;
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,6 +29,11 @@ class OrderUseCaseConfig {
     ImportOrdersUseCase importOrdersUseCase(ObjectProvider<MallOrderClient> mallOrderClients,
                                             OrderRepository orderRepository) {
         return new ImportOrdersUseCase(mallOrderClients.stream().toList(), orderRepository);
+    }
+
+    @Bean
+    FindStocksUseCase findStocksUseCase(StockRepository stockRepository) {
+        return new FindStocksUseCase(stockRepository);
     }
 
     @Bean
