@@ -80,6 +80,49 @@ class OrderStatusTest {
     }
 
     @Nested
+    @DisplayName("在庫への影響")
+    class 在庫への影響 {
+
+        @Test
+        void 確認したときに在庫を引き当てる() {
+            // 取込直後(NEW)は内容確認前で、モール側キャンセルや不正注文も混じる。
+            // 未確認の受注で在庫を押さえると、正常な受注に引き当てられなくなる
+            assertThat(NEW.stockEffectOf(CONFIRMED)).isEqualTo(StockEffect.ALLOCATE);
+        }
+
+        @Test
+        void 出荷指示では在庫は動かない() {
+            // 確認時に引当済であり、モノもまだ倉庫から出ていない
+            assertThat(CONFIRMED.stockEffectOf(SHIPPING_INSTRUCTED)).isEqualTo(StockEffect.NONE);
+        }
+
+        @Test
+        void 出荷完了で引当を実在庫から落とす() {
+            // 約束(引当)を取り消すのではなく果たす。解除にすると出荷した分の実在庫が残る
+            assertThat(SHIPPING_INSTRUCTED.stockEffectOf(SHIPPED)).isEqualTo(StockEffect.SHIP_OUT);
+        }
+
+        @ParameterizedTest(name = "{0} からのキャンセルは引当を解除する")
+        @CsvSource({"CONFIRMED", "SHIPPING_INSTRUCTED"})
+        void 引当済の受注をキャンセルすると引当を解除する(OrderStatus status) {
+            assertThat(status.stockEffectOf(CANCELLED)).isEqualTo(StockEffect.RELEASE);
+        }
+
+        @Test
+        void 確認前のキャンセルでは在庫は動かない() {
+            // まだ引き当てていないので解除するものが無い
+            assertThat(NEW.stockEffectOf(CANCELLED)).isEqualTo(StockEffect.NONE);
+        }
+
+        @Test
+        void 返品では在庫を戻さない() {
+            // 返品されたモノは検品を経てから在庫に戻す。検品フローはスコープ外であり、
+            // 自動で戻すと不良品を引き当て可能な在庫として数えてしまう
+            assertThat(SHIPPED.stockEffectOf(RETURNED)).isEqualTo(StockEffect.NONE);
+        }
+    }
+
+    @Nested
     @DisplayName("終端ステータス")
     class 終端ステータス {
 

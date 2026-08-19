@@ -1,11 +1,14 @@
 package com.minioms.infrastructure.config;
 
+import com.minioms.application.TransactionRunner;
 import com.minioms.application.order.FindOrdersUseCase;
 import com.minioms.application.order.ImportOrdersUseCase;
 import com.minioms.application.order.OrderLifecycleUseCase;
 import com.minioms.application.order.MallOrderClient;
 import com.minioms.application.order.OrderRepository;
 import com.minioms.application.order.OrderSearchQuery;
+import com.minioms.application.stock.StockAllocationService;
+import com.minioms.application.stock.StockRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,8 +31,15 @@ class OrderUseCaseConfig {
     }
 
     @Bean
-    OrderLifecycleUseCase orderLifecycleUseCase(OrderRepository orderRepository) {
-        return new OrderLifecycleUseCase(orderRepository);
+    StockAllocationService stockAllocationService(StockRepository stockRepository) {
+        return new StockAllocationService(stockRepository);
+    }
+
+    @Bean
+    OrderLifecycleUseCase orderLifecycleUseCase(OrderRepository orderRepository,
+                                                StockAllocationService stockAllocationService,
+                                                TransactionRunner transactionRunner) {
+        return new OrderLifecycleUseCase(orderRepository, stockAllocationService, transactionRunner);
     }
 
     @Bean

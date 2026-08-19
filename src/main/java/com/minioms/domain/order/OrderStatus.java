@@ -70,6 +70,27 @@ public enum OrderStatus {
         return this == CONFIRMED || this == SHIPPING_INSTRUCTED;
     }
 
+    /**
+     * この状態から指定の状態へ遷移したとき、在庫に何をすべきか。
+     *
+     * <p>引当を抱えていない状態から抱える状態へ進めば引当、抱えた状態から
+     * 手放す状態へ進めば解除。ただし出荷完了だけは、約束を取り消すのではなく
+     * 果たす(実在庫から落とす)ため区別する。</p>
+     *
+     * <p>Why not: 遷移の組み合わせを列挙しない。遷移を1本追加するたびに
+     * 在庫側の対応表を書き足す必要が生まれ、書き漏らすと在庫だけが狂う。
+     * 「引当を抱えているか」という状態の性質から導く。</p>
+     */
+    public StockEffect stockEffectOf(OrderStatus target) {
+        if (!holdsStockAllocation() && target.holdsStockAllocation()) {
+            return StockEffect.ALLOCATE;
+        }
+        if (holdsStockAllocation() && !target.holdsStockAllocation()) {
+            return target == SHIPPED ? StockEffect.SHIP_OUT : StockEffect.RELEASE;
+        }
+        return StockEffect.NONE;
+    }
+
     /** 終端ステータス(以降の遷移が存在しない)か */
     public boolean isTerminal() {
         return ALLOWED_TRANSITIONS.get(this).isEmpty();
