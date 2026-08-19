@@ -1,10 +1,12 @@
 package com.minioms.domain.order;
 
+import com.minioms.domain.DomainException;
+
 /**
  * 許可されていないステータス遷移が要求されたことを表す業務例外。
  * HTTPステータスへの変換は presentation 層の責務(ここでは行わない)。
  */
-public class InvalidStatusTransitionException extends RuntimeException {
+public class InvalidStatusTransitionException extends DomainException {
 
     private final OrderStatus from;
     private final OrderStatus to;
