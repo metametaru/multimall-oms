@@ -1,8 +1,10 @@
 package com.minioms.infrastructure.config;
 
+import com.minioms.application.order.FindOrdersUseCase;
 import com.minioms.application.order.ImportOrdersUseCase;
 import com.minioms.application.order.MallOrderClient;
 import com.minioms.application.order.OrderRepository;
+import com.minioms.application.order.OrderSearchQuery;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,5 +24,10 @@ class OrderUseCaseConfig {
     ImportOrdersUseCase importOrdersUseCase(ObjectProvider<MallOrderClient> mallOrderClients,
                                             OrderRepository orderRepository) {
         return new ImportOrdersUseCase(mallOrderClients.stream().toList(), orderRepository);
+    }
+
+    @Bean
+    FindOrdersUseCase findOrdersUseCase(OrderSearchQuery orderSearchQuery, OrderRepository orderRepository) {
+        return new FindOrdersUseCase(orderSearchQuery, orderRepository);
     }
 }

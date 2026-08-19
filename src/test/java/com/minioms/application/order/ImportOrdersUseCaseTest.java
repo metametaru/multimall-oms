@@ -186,5 +186,10 @@ class ImportOrdersUseCaseTest {
         public Optional<Order> findByMallOrderKey(MallOrderKey mallOrderKey) {
             return Optional.ofNullable(stored.get(mallOrderKey));
         }
+
+        @Override
+        public Optional<Order> findById(long orderId) {
+            return stored.values().stream().filter(order -> order.id() == orderId).findFirst();
+        }
     }
 }

@@ -79,7 +79,7 @@ class MallOrderClientIntegrationTest {
         void モールAのIDが冪等キーに設定される() {
             assertThat(fetch())
                     .allSatisfy(order -> assertThat(order.mallOrderKey().mallId())
-                            .isEqualTo(mallCatalog.idOf(MallAOrderClient.MALL_CODE)));
+                            .isEqualTo(mallCatalog.requireIdOf(MallAOrderClient.MALL_CODE)));
         }
     }
 

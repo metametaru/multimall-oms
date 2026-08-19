@@ -36,6 +36,12 @@ class OrderRepositoryAdapter implements OrderRepository {
                 .map(OrderMapper::toDomain);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Order> findById(long orderId) {
+        return jpaRepository.findWithItemsById(orderId).map(OrderMapper::toDomain);
+    }
+
     private Order insert(Order order) {
         try {
             // Why not: save() ではなく saveAndFlush()。save() だけでは制約違反が

@@ -48,7 +48,7 @@ class MallBOrderClient implements MallOrderClient {
 
     @Override
     public long mallId() {
-        return mallCatalog.idOf(MALL_CODE);
+        return mallCatalog.requireIdOf(MALL_CODE);
     }
 
     @Override

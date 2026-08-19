@@ -24,4 +24,7 @@ public interface OrderRepository {
     Order save(Order order);
 
     Optional<Order> findByMallOrderKey(MallOrderKey mallOrderKey);
+
+    /** 明細を含む受注を取得する。更新系ユースケースが集約を復元するために使う */
+    Optional<Order> findById(long orderId);
 }

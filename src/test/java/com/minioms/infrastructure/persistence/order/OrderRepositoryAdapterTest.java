@@ -142,6 +142,28 @@ class OrderRepositoryAdapterTest {
     }
 
     @Test
+    void IDを指定すると明細ごと取り出せる() {
+        // 詳細画面と更新系ユースケースはIDで受注を復元する。open-in-view を無効に
+        // しているため、明細が遅延ロードのまま返るとトランザクション外で必ず壊れる
+        Order saved = orderRepository.save(importedOrder(new MallOrderKey(mallA, "A-20260819-0005")));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(orderRepository.findById(saved.id()))
+                .get()
+                .satisfies(order -> {
+                    assertThat(order.mallOrderKey().mallOrderNumber()).isEqualTo("A-20260819-0005");
+                    assertThat(order.items()).hasSize(1);
+                });
+    }
+
+    @Test
+    void 存在しないIDでは何も返らない() {
+        assertThat(orderRepository.findById(999_999L)).isEmpty();
+    }
+
+    @Test
     void 未登録の冪等キーでは何も返らない() {
         assertThat(orderRepository.findByMallOrderKey(new MallOrderKey(mallA, "存在しない番号"))).isEmpty();
     }
