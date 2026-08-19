@@ -2,9 +2,12 @@ package com.minioms.presentation.order;
 
 import com.minioms.application.mall.MallDirectory;
 import com.minioms.application.order.FindOrdersUseCase;
+import com.minioms.application.order.OrderLifecycleUseCase;
 import com.minioms.application.order.OrderSearchCriteria;
 import com.minioms.application.order.OrderSearchResult;
 import com.minioms.application.order.OrderSummary;
+import com.minioms.domain.order.ConcurrentOrderUpdateException;
+import com.minioms.domain.order.InvalidStatusTransitionException;
 import com.minioms.domain.order.MallOrderKey;
 import com.minioms.domain.order.Order;
 import com.minioms.domain.order.OrderItem;
@@ -30,22 +33,24 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 受注参照APIのHTTP契約。
+ * 受注APIのHTTP契約。
  *
- * <p>オペレーターの主画面は「未確認の受注を古い順に処理する」一覧であり、
- * このAPIがその入口になる。ここで固定するのは業務ルールそのものではなく、
- * 業務ルール違反や不正な入力がどのHTTPステータスで表現されるかという契約。</p>
+ * <p>オペレーターは一覧で受注を選び、詳細を確認し、出荷指示やキャンセルを行う。
+ * ここで固定するのは業務ルールそのものではなく、業務ルール違反や不正な入力が
+ * どのHTTPステータスで表現されるかという契約。</p>
  *
  * <p>Why not: 認証は掛けずにテストする。第3週の認証実装まで SecurityConfig は
  * 全開放であり、ここに認証を含めると本実装への差し替え時にAPI契約のテストまで
  * 巻き添えで壊れるため。</p>
  */
-@DisplayName("受注参照API")
+@DisplayName("受注API")
 @WebMvcTest(OrderController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class OrderControllerTest {
@@ -57,6 +62,9 @@ class OrderControllerTest {
 
     @MockitoBean
     private FindOrdersUseCase findOrdersUseCase;
+
+    @MockitoBean
+    private OrderLifecycleUseCase orderLifecycleUseCase;
 
     @MockitoBean
     private MallDirectory mallDirectory;
@@ -186,6 +194,83 @@ class OrderControllerTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.title").value("受注が見つかりません"))
                     .andExpect(jsonPath("$.detail").value("受注が存在しません: id=999"));
+        }
+    }
+
+    @Nested
+    @DisplayName("受注を業務フローに沿って進める")
+    class 受注を業務フローに沿って進める {
+
+        private static final String VERSION_3 = """
+                {"version": 3}
+                """;
+
+        @Test
+        void 出荷指示は業務操作としてのURLで受け付ける() throws Exception {
+            // Why not: PATCH でstatusフィールドを書き換える形にしない。
+            // クライアントが状態機械を知っている前提になり、操作の業務的な意味が消える
+            given(orderLifecycleUseCase.instructShipping(10L, 3L))
+                    .willReturn(order(OrderStatus.SHIPPING_INSTRUCTED));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(post("/api/orders/10/shipping-instruction")
+                            .contentType(APPLICATION_JSON).content(VERSION_3))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SHIPPING_INSTRUCTED"));
+        }
+
+        @Test
+        void キャンセルは業務操作としてのURLで受け付ける() throws Exception {
+            given(orderLifecycleUseCase.cancel(10L, 3L)).willReturn(order(OrderStatus.CANCELLED));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(post("/api/orders/10/cancellation")
+                            .contentType(APPLICATION_JSON).content(VERSION_3))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
+        }
+
+        @Test
+        void バージョンを省略したリクエストは400になる() throws Exception {
+            // 省略を許すと「今のDBの状態に無条件で適用する」意味になり、
+            // 楽観ロックが機能しなくなる
+            mockMvc.perform(post("/api/orders/10/cancellation")
+                            .contentType(APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.title").value("リクエストが不正です"))
+                    .andExpect(jsonPath("$.detail").value("version: version は必須です"));
+        }
+
+        @Test
+        void 許可されていない遷移は409になる() throws Exception {
+            // リクエストの形式は正しく、受注の「今の状態」と衝突しているだけなので400にはしない
+            given(orderLifecycleUseCase.cancel(10L, 3L)).willThrow(
+                    new InvalidStatusTransitionException(OrderStatus.SHIPPING_INSTRUCTED, OrderStatus.CANCELLED));
+
+            mockMvc.perform(post("/api/orders/10/cancellation")
+                            .contentType(APPLICATION_JSON).content(VERSION_3))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.title").value("処理できない要求です"))
+                    .andExpect(jsonPath("$.detail").value("不正なステータス遷移: SHIPPING_INSTRUCTED → CANCELLED"));
+        }
+
+        @Test
+        void 他のオペレーターが先に更新していると409になる() throws Exception {
+            given(orderLifecycleUseCase.confirm(10L, 3L)).willThrow(new ConcurrentOrderUpdateException(10L));
+
+            mockMvc.perform(post("/api/orders/10/confirmation")
+                            .contentType(APPLICATION_JSON).content(VERSION_3))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").value("受注が他の処理によって更新されています: id=10"));
+        }
+
+        @Test
+        void 存在しない受注への操作は404になる() throws Exception {
+            given(orderLifecycleUseCase.ship(999L, 3L)).willThrow(new OrderNotFoundException(999L));
+
+            mockMvc.perform(post("/api/orders/999/shipment")
+                            .contentType(APPLICATION_JSON).content(VERSION_3))
+                    .andExpect(status().isNotFound());
         }
     }
 }

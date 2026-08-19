@@ -1,5 +1,6 @@
 package com.minioms.application.order;
 
+import com.minioms.domain.order.ConcurrentOrderUpdateException;
 import com.minioms.domain.order.DuplicateMallOrderException;
 import com.minioms.domain.order.MallOrderKey;
 import com.minioms.domain.order.Order;
@@ -20,6 +21,7 @@ public interface OrderRepository {
      *
      * @return 採番済みID・更新後バージョンを反映した受注
      * @throws DuplicateMallOrderException 新規登録で冪等キーが既に存在した場合
+     * @throws ConcurrentOrderUpdateException 更新で、渡された受注より新しいバージョンが保存済みの場合
      */
     Order save(Order order);
 

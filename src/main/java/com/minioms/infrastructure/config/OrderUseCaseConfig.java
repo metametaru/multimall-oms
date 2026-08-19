@@ -2,6 +2,7 @@ package com.minioms.infrastructure.config;
 
 import com.minioms.application.order.FindOrdersUseCase;
 import com.minioms.application.order.ImportOrdersUseCase;
+import com.minioms.application.order.OrderLifecycleUseCase;
 import com.minioms.application.order.MallOrderClient;
 import com.minioms.application.order.OrderRepository;
 import com.minioms.application.order.OrderSearchQuery;
@@ -24,6 +25,11 @@ class OrderUseCaseConfig {
     ImportOrdersUseCase importOrdersUseCase(ObjectProvider<MallOrderClient> mallOrderClients,
                                             OrderRepository orderRepository) {
         return new ImportOrdersUseCase(mallOrderClients.stream().toList(), orderRepository);
+    }
+
+    @Bean
+    OrderLifecycleUseCase orderLifecycleUseCase(OrderRepository orderRepository) {
+        return new OrderLifecycleUseCase(orderRepository);
     }
 
     @Bean

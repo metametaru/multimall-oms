@@ -1,7 +1,9 @@
 package com.minioms.infrastructure.persistence.order;
 
 import com.minioms.application.order.OrderRepository;
+import com.minioms.domain.order.ConcurrentOrderUpdateException;
 import com.minioms.domain.order.DuplicateMallOrderException;
+import com.minioms.domain.order.OrderNotFoundException;
 import com.minioms.domain.order.MallOrderKey;
 import com.minioms.domain.order.Order;
 import lombok.RequiredArgsConstructor;
@@ -56,17 +58,20 @@ class OrderRepositoryAdapter implements OrderRepository {
 
     private Order update(Order order) {
         OrderJpaEntity entity = jpaRepository.findById(order.id())
-                .orElseThrow(() -> new OptimisticLockingFailureException(
-                        "更新対象の受注が存在しません: id=" + order.id()));
+                .orElseThrow(() -> new OrderNotFoundException(order.id()));
 
         if (!entity.getVersion().equals(order.version())) {
-            throw new OptimisticLockingFailureException(
-                    "受注が他の処理に更新されています: id=%d".formatted(order.id()));
+            throw new ConcurrentOrderUpdateException(order.id());
         }
 
         // Why not: 明細や金額は更新対象にしない。モールから取り込んだ受注内容を
         // OMS側で書き換える業務は存在せず、変わるのはステータスだけであるため
         entity.changeStatus(order.status());
-        return OrderMapper.toDomain(jpaRepository.saveAndFlush(entity));
+        try {
+            return OrderMapper.toDomain(jpaRepository.saveAndFlush(entity));
+        } catch (OptimisticLockingFailureException e) {
+            // 直前のバージョン照合をすり抜けた同時更新。JPAの @Version が最終防衛線になる
+            throw new ConcurrentOrderUpdateException(order.id());
+        }
     }
 }

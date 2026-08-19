@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -36,6 +38,23 @@ class ApiExceptionHandler {
     @ExceptionHandler({UnknownMallCodeException.class, IllegalArgumentException.class})
     ProblemDetail handleInvalidInput(RuntimeException e) {
         return problem(HttpStatus.BAD_REQUEST, "リクエストが不正です", e.getMessage());
+    }
+
+    /** リクエストボディの検証違反: 400。どの項目が問題かを利用者に返す */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ProblemDetail handleValidationError(MethodArgumentNotValidException e) {
+        String detail = e.getBindingResult().getFieldErrors().stream()
+                .map(error -> "%s: %s".formatted(error.getField(), error.getDefaultMessage()))
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("リクエストボディが不正です");
+        return problem(HttpStatus.BAD_REQUEST, "リクエストが不正です", detail);
+    }
+
+    /** 解釈できないリクエストボディ: 400 */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ProblemDetail handleUnreadableBody(HttpMessageNotReadableException e) {
+        // Why not: 例外メッセージをそのまま返さない。内部のクラス名やパース位置が漏れる
+        return problem(HttpStatus.BAD_REQUEST, "リクエストが不正です", "リクエストボディを解釈できません");
     }
 
     /** 型の合わない値(存在しないステータス名など): 400 */

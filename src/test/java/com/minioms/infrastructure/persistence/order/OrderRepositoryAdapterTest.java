@@ -2,6 +2,7 @@ package com.minioms.infrastructure.persistence.order;
 
 import com.minioms.TestcontainersConfiguration;
 import com.minioms.application.order.OrderRepository;
+import com.minioms.domain.order.ConcurrentOrderUpdateException;
 import com.minioms.domain.order.DuplicateMallOrderException;
 import com.minioms.domain.order.MallOrderKey;
 import com.minioms.domain.order.Order;
@@ -16,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,7 +130,7 @@ class OrderRepositoryAdapterTest {
     }
 
     @Test
-    void 古いバージョンの受注で更新すると楽観ロックエラーになる() {
+    void 古いバージョンの受注で更新すると同時更新エラーになる() {
         // 同じ受注を2人のオペレーターが同時に開いた場合、後勝ちで一方の操作が
         // 消えるのを防ぐ。出荷指示とキャンセルが競合すると実害が大きい
         MallOrderKey key = new MallOrderKey(mallA, "A-20260819-0004");
@@ -138,7 +138,7 @@ class OrderRepositoryAdapterTest {
         orderRepository.save(saved.confirm());
 
         assertThatThrownBy(() -> orderRepository.save(saved.cancel()))
-                .isInstanceOf(OptimisticLockingFailureException.class);
+                .isInstanceOf(ConcurrentOrderUpdateException.class);
     }
 
     @Test
