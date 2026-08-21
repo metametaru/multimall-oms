@@ -43,10 +43,7 @@ docker compose up -d      # PostgreSQL 16 を起動
 
 起動したら **http://localhost:8080/** を開くとオペレーター画面が出ます。
 
-```
-受注 #2  A-20260819-0002  鈴木一郎  CONFIRMED   [出荷指示] [キャンセル]
-在庫     SKU-002  実10  引2  可8
-```
+![オペレーター画面](docs/operator-screen.jpg)
 
 操作ボタンは受注ごとのステータスから決まり、押すと在庫の行がその場で動きます。
 `viewer` でログインすると操作欄は「参照のみ」になります。
@@ -445,6 +442,7 @@ Playwright は Chromium だけを使います。既定では Firefox と WebKit 
 - PostgreSQL 16 + Flyway
 - Gradle (Kotlin DSL)
 - JUnit 5 / AssertJ / Testcontainers / Playwright
+- GitHub Actions(push と Pull Request でテストを実行)
 
 ---
 
@@ -466,6 +464,12 @@ Playwright は Chromium だけを使います。既定では Firefox と WebKit 
   作れば権限昇格という別の攻撃面を抱え込みます。デモ用の利用者は起動時に投入しています。
 - **トークンの即時失効** — 失効リストを持つとステートレスの前提が崩れるため、
   寿命を短く保つ割り切りを設定として明示しています。
+
+---
+
+## ライセンス
+
+MIT License。詳細は [LICENSE](LICENSE) を参照してください。
 
 ---
 

@@ -59,7 +59,12 @@ val installPlaywrightBrowser by tasks.registering(JavaExec::class) {
     description = "画面E2Eに使う Chromium を取得する(取得済みなら何もしない)"
     classpath = sourceSets["test"].runtimeClasspath
     mainClass = "com.microsoft.playwright.CLI"
-    args("install", "chromium")
+
+    // Why not: --with-deps を常に付けない。CI の素のUbuntuではブラウザが依存する
+    // 共有ライブラリを入れる必要があるが、この指定は sudo を要求するため、
+    // 開発者の手元で勝手に走らせるべきではない。CI だけが明示的に有効化する
+    val withDeps = providers.gradleProperty("playwrightWithDeps").isPresent
+    setArgs(if (withDeps) listOf("install", "--with-deps", "chromium") else listOf("install", "chromium"))
 }
 
 tasks.withType<Test> {

@@ -1,0 +1,49 @@
+name: test
+
+# Why not: スケジュール実行は入れない。このリポジトリは依存を自動更新しておらず、
+# 変更が無いのに落ちる通知は見なくなるだけで、壊れたときに気づけなくなる。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: JUnit / Testcontainers / Playwright
+    # Testcontainers が実PostgreSQLを、Playwright が Chromium を起動する。
+    # どちらも動く環境として Docker 同梱の ubuntu を使う
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21 を用意する
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Gradle を用意する
+        uses: gradle/actions/setup-gradle@v4
+
+      # Why: ブラウザ本体は毎回取得すると1分近くかかる。Playwright のバージョンを
+      # 鍵にして、build.gradle.kts が変わったときだけ取り直す
+      - name: Chromium をキャッシュから復元する
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('build.gradle.kts') }}
+
+      # -PplaywrightWithDeps: 素のUbuntuにはブラウザが依存する共有ライブラリが無いため、
+      # CI に限って OS 側の依存も入れる(ローカルでは sudo を要求するので既定では付けない)
+      - name: テストを実行する
+        run: ./gradlew test -PplaywrightWithDeps
+
+      - name: 失敗したテストのレポートを残す
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
+          retention-days: 7
