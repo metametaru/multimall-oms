@@ -21,6 +21,7 @@ record OrderSummaryResponse(
         String mallCode,
         String mallOrderNumber,
         OrderStatus status,
+        String statusLabel,
         String customerName,
         BigDecimal totalAmount,
         OffsetDateTime orderedAt,
@@ -30,6 +31,7 @@ record OrderSummaryResponse(
     static OrderSummaryResponse from(OrderSummary summary, String mallCode) {
         return new OrderSummaryResponse(
                 summary.id(), mallCode, summary.mallOrderNumber(), summary.status(),
+                OrderStatusLabel.of(summary.status()),
                 summary.customerName(), summary.totalAmount(), summary.orderedAt(), summary.version(),
                 OrderAction.availableFrom(summary.status()));
     }

@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * 受注API。オペレーターの受注一覧・詳細と、受注を業務フローに沿って進める操作の入口。
  *
@@ -55,6 +57,17 @@ class OrderController {
                 result.totalCount(),
                 criteria.page(),
                 criteria.size());
+    }
+
+    /**
+     * 絞り込みに使えるステータスの一覧。
+     *
+     * <p>Why not: 画面側に選択肢を並べさせない。ステータスを追加したときに
+     * 画面だけ古い一覧のまま残り、新しいステータスの受注が絞り込めなくなる。</p>
+     */
+    @GetMapping("/statuses")
+    List<OrderStatusResponse> statuses() {
+        return OrderStatusLabel.all();
     }
 
     @GetMapping("/{orderId}")

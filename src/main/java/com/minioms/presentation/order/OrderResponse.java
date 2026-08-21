@@ -17,6 +17,7 @@ record OrderResponse(
         String mallCode,
         String mallOrderNumber,
         OrderStatus status,
+        String statusLabel,
         String customerName,
         BigDecimal totalAmount,
         BigDecimal itemsSubtotal,
@@ -31,6 +32,7 @@ record OrderResponse(
                 mallCode,
                 order.mallOrderKey().mallOrderNumber(),
                 order.status(),
+                OrderStatusLabel.of(order.status()),
                 order.customerName(),
                 order.totalAmount(),
                 // モールの提示額と一致しないことがある(送料・モール側割引)。

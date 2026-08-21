@@ -42,15 +42,11 @@
             <div class="panel-head">
                 <h2>受注</h2>
                 <div class="filters">
+                    <!-- 選択肢は /api/orders/statuses から作る。ここに並べると
+                         ステータスが増えたときに画面だけ古い一覧のまま残る -->
                     <label>ステータス
                         <select id="filter-status">
                             <option value="">すべて</option>
-                            <option value="NEW">NEW</option>
-                            <option value="CONFIRMED">CONFIRMED</option>
-                            <option value="SHIPPING_INSTRUCTED">SHIPPING_INSTRUCTED</option>
-                            <option value="SHIPPED">SHIPPED</option>
-                            <option value="CANCELLED">CANCELLED</option>
-                            <option value="RETURNED">RETURNED</option>
                         </select>
                     </label>
                     <label>モール

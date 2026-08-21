@@ -29,11 +29,13 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -197,6 +199,55 @@ class OrderControllerTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.title").value("受注が見つかりません"))
                     .andExpect(jsonPath("$.detail").value("受注が存在しません: id=999"));
+        }
+    }
+
+    @Nested
+    @DisplayName("ステータスの表示名")
+    class ステータスの表示名 {
+
+        @Test
+        void 値は英語のまま表示名だけを日本語で返す() {
+            // 表示名を値として送ると、言い回しを変えただけでクライアントの分岐が壊れる。
+            // 絞り込みやスタイルの出し分けに使う値は enum 名のまま保つ
+            given(findOrdersUseCase.findById(10L)).willReturn(order(OrderStatus.SHIPPING_INSTRUCTED));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            assertThatCode(() -> mockMvc.perform(get("/api/orders/10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SHIPPING_INSTRUCTED"))
+                    .andExpect(jsonPath("$.statusLabel").value("出荷指示済")))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        void 一覧の各行にも表示名を返す() throws Exception {
+            given(findOrdersUseCase.search(any()))
+                    .willReturn(new OrderSearchResult(List.of(summary(1L, OrderStatus.NEW)), 1));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(get("/api/orders"))
+                    .andExpect(jsonPath("$.orders[0].status").value("NEW"))
+                    .andExpect(jsonPath("$.orders[0].statusLabel").value("新規受付"));
+        }
+
+        @Test
+        void 絞り込みに使えるステータスを表示名つきで列挙する() throws Exception {
+            // 画面が選択肢を自前で並べると、ステータスが増えたときに絞り込めなくなる
+            mockMvc.perform(get("/api/orders/statuses"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(OrderStatus.values().length))
+                    .andExpect(jsonPath("$[0].value").value("NEW"))
+                    .andExpect(jsonPath("$[0].label").value("新規受付"));
+        }
+
+        @Test
+        void ステータス一覧のパスは受注IDとして解釈されない() throws Exception {
+            // /api/orders/{orderId} と同じ形のため、取り違えると 400 になる
+            mockMvc.perform(get("/api/orders/statuses"))
+                    .andExpect(status().isOk());
+
+            verify(findOrdersUseCase, never()).findById(anyLong());
         }
     }
 

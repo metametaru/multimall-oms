@@ -94,7 +94,20 @@
         dom.loginPanel.hidden = true;
         dom.work.hidden = false;
 
+        await loadStatusOptions();
         await refresh();
+    }
+
+    /** 絞り込みの選択肢はサーバーから受け取る。画面はステータスの一覧を知らない */
+    async function loadStatusOptions() {
+        const statuses = await callApi('/api/orders/statuses');
+        const options = statuses.map((status) => {
+            const option = document.createElement('option');
+            option.value = status.value;
+            option.textContent = status.label;
+            return option;
+        });
+        dom.filterStatus.replaceChildren(dom.filterStatus.options[0], ...options);
     }
 
     function logout() {
@@ -104,6 +117,7 @@
         dom.loginPanel.hidden = false;
         dom.orders.replaceChildren();
         dom.stocks.replaceChildren();
+        dom.filterStatus.value = '';
     }
 
     // --- 描画 ---
@@ -139,7 +153,7 @@
             cell(order.mallOrderNumber),
             cell(order.customerName),
             cell(formatAmount(order.totalAmount), 'num'),
-            statusCell(order.status),
+            statusCell(order),
             actionCell(order),
         );
         return row;
@@ -182,7 +196,7 @@
             const updated = await postJson(
                 `/api/orders/${order.id}/${action.operation}`, {version: order.version});
             await refresh();
-            notify(`受注${order.id} を ${updated.status} にしました`, 'ok');
+            notify(`受注${order.id} を「${updated.statusLabel}」にしました`, 'ok');
         } catch (error) {
             handle(error);
             button.disabled = false;
@@ -208,10 +222,14 @@
         return text('td', value, className);
     }
 
-    function statusCell(status) {
+    /**
+     * 表示は日本語、値は enum 名のまま。data-status に enum 名を残すのは、
+     * 見た目の出し分け(CSS)が表示名の言い回しに引きずられないようにするため
+     */
+    function statusCell(order) {
         const td = document.createElement('td');
-        const badge = text('span', status, 'status');
-        badge.dataset.status = status;
+        const badge = text('span', order.statusLabel, 'status');
+        badge.dataset.status = order.status;
         td.append(badge);
         return td;
     }

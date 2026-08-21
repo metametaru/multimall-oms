@@ -154,6 +154,7 @@ stateDiagram-v2
 |---|---|---|---|
 | POST | `/api/auth/login` | ログイン(アクセストークン発行) | 不要 |
 | GET | `/api/orders?status=&mallCode=&page=&size=` | 受注一覧(注文日時の古い順) | VIEWER / OPERATOR |
+| GET | `/api/orders/statuses` | ステータスの一覧(絞り込みの選択肢) | VIEWER / OPERATOR |
 | GET | `/api/orders/{id}` | 受注詳細(明細つき) | VIEWER / OPERATOR |
 | POST | `/api/orders/{id}/confirmation` | 確認(在庫引当) | OPERATOR |
 | POST | `/api/orders/{id}/shipping-instruction` | 出荷指示 | OPERATOR |
@@ -283,6 +284,21 @@ $ curl -X POST .../api/orders/2/confirmation -d '{"version":0}'
 画面は `availableActions` をボタンとして並べるだけです。「NEWなら確認とキャンセル」という
 対応表を画面が持つと遷移ルールが二重化し、遷移を1本追加したときに画面だけ古いまま残ります。
 `OrderStatus` が唯一の真実である状態を、画面を足しても崩さないための形です。
+
+同じ理由で、**ステータスの表示名もサーバーが返します**。値は enum 名のままで、
+人に見せる文字列だけを `statusLabel` として添えます。
+
+| | 値 | 表示 |
+|---|---|---|
+| 用途 | 絞り込み、スタイルの出し分け | 人が読む |
+| 例 | `SHIPPING_INSTRUCTED` | 出荷指示済 |
+
+表示名を値として送ってしまうと、言い回しを変えただけでクライアントの分岐が壊れます。
+逆に対応表を画面側に置くと、ステータスを追加したときに画面だけ enum 名を素で表示します。
+絞り込みの選択肢も `GET /api/orders/statuses` から取るので、画面はステータスの一覧を知りません。
+
+表示名を `OrderStatus` 自体に持たせないのは、どう呼ぶかは画面の都合で変わる一方、
+ステータスそのものは業務の構造であり、**変わる理由が違う**ためです。
 
 権限による出し分けにはログイン応答の `role` を使います。トークンを画面側で復号して
 読む形にすると、画面が自分の権限を自称する経路になるためです。
