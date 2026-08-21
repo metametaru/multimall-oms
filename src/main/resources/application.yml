@@ -24,3 +24,13 @@ minioms:
     # 重複は冪等キーで弾かれるので、重ねる方が安全
     interval: PT1M
     lookback: PT1H
+  security:
+    jwt:
+      # 署名鍵。未設定なら起動ごとにランダム生成する(再起動で既存トークンは無効になる)。
+      # 本番相当の構成では MINIOMS_SECURITY_JWT_SECRET で必ず注入する。
+      # Why not: 既定値をここに書かない。公開リポジトリに鍵が残ると、
+      # そのビルドで発行されたトークンを誰でも偽造できる
+      secret: ${MINIOMS_SECURITY_JWT_SECRET:}
+      # 失効リストを持たない代わりに寿命を短くする。
+      # ログアウトしても最大この時間はトークンが有効、という割り切りを設定として明示する
+      ttl: PT1H

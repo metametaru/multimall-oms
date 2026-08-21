@@ -25,6 +25,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // JWTの発行(NimbusJwtEncoder)と検証(NimbusJwtDecoder)。
+    // Why not: JWTライブラリを直接依存に入れない。トークンの検証は実装を誤ると
+    // 静かに認証が素通りする箇所であり、Spring Security が保証する経路に乗せる
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
     // モールBのレスポンスがXML。クライアント専用のXmlMapperとして使う
