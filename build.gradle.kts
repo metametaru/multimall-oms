@@ -47,9 +47,24 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    // 画面E2E。ブラウザ本体は初回実行時に取得される
+    testImplementation("com.microsoft.playwright:playwright:1.62.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// Why not: ブラウザの自動取得に任せない。既定では Chromium / Firefox / WebKit の
+// 3種すべてが入り 1GB 近くを消費するが、画面E2Eに要るのは Chromium だけ。
+// clone した人が追加の手順を踏まずに済むよう、取得自体はビルドに組み込む。
+val installPlaywrightBrowser by tasks.registering(JavaExec::class) {
+    description = "画面E2Eに使う Chromium を取得する(取得済みなら何もしない)"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "com.microsoft.playwright.CLI"
+    args("install", "chromium")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    dependsOn(installPlaywrightBrowser)
+    // 取得は上のタスクが担うため、テスト実行時の自動取得は止める
+    environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
 }

@@ -147,6 +147,9 @@
 
     function orderRow(order) {
         const row = document.createElement('tr');
+        // Why: 行と数値に識別子を付ける。E2Eテストが列の並びや見た目のためのクラスを
+        // 頼りにすると、体裁を整えただけでテストが落ちる
+        row.dataset.orderId = order.id;
         row.append(
             cell(order.id),
             cell(order.mallCode),
@@ -206,11 +209,12 @@
     function renderStocks(stocks) {
         dom.stocks.replaceChildren(...stocks.map((stock) => {
             const row = document.createElement('tr');
+            row.dataset.productCode = stock.productCode;
             row.append(
                 cell(stock.productCode),
-                cell(stock.quantityOnHand, 'num'),
-                cell(stock.quantityAllocated, 'num'),
-                cell(stock.availableQuantity, 'num'),
+                cell(stock.quantityOnHand, 'num on-hand'),
+                cell(stock.quantityAllocated, 'num allocated'),
+                cell(stock.availableQuantity, 'num available'),
             );
             return row;
         }));
