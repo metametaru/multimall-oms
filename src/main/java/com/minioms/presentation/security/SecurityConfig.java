@@ -33,6 +33,9 @@ class SecurityConfig {
     /** 認証を受けるための入口。ここだけは認証なしで通す必要がある */
     static final String LOGIN_PATH = "/api/auth/login";
 
+    /** オペレーター画面を構成するファイル。1つずつ列挙し、増えたら明示的に足す */
+    private static final String[] STATIC_RESOURCES = {"/", "/index.html", "/app.js", "/app.css", "/favicon.ico"};
+
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http,
                                     JwtAuthenticationConverter jwtAuthenticationConverter,
@@ -46,6 +49,12 @@ class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.ASYNC).permitAll()
 
                         .requestMatchers(HttpMethod.POST, LOGIN_PATH).permitAll()
+
+                        // 画面のファイルそのものは誰でも取得できてよい。中身は空の器で、
+                        // 表示するデータはすべて認証付きのAPIから取りに行く。
+                        // Why not: /** のようなワイルドカードで開けない。将来 static 配下に
+                        // 置いたものが、意図せず無認証で読める状態になる
+                        .requestMatchers(HttpMethod.GET, STATIC_RESOURCES).permitAll()
 
                         // モールAPIのモックは mock プロファイルでしか存在せず、
                         // 取込スケジューラが同一プロセスへHTTPで取りに行くため認証を挟まない

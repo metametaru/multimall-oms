@@ -159,6 +159,19 @@ class OrderFlowEndToEndTest {
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void 画面のファイルは認証なしで取得できるがデータは入っていない() {
+        // 画面は空の器で、表示するデータはすべて認証付きのAPIから取りに行く。
+        // 器を開くだけで受注や在庫が見えてしまわないことを確認する
+        ResponseEntity<String> page = restTemplate.getForEntity("/", String.class);
+
+        assertThat(page.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(page.getBody())
+                .contains("<title>mini-oms</title>")
+                .doesNotContain(MALL_B_ORDER_NUMBER)
+                .doesNotContain(PRODUCT_CODE);
+    }
+
     // --- ヘルパー ---
 
     private ImportSummary 受注を取り込む() {

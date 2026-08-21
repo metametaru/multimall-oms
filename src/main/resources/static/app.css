@@ -1,0 +1,260 @@
+/*
+ * オペレーター画面のスタイル。
+ * Why not: CSSフレームワークを入れない。この画面の目的は業務フローを触れるようにすることで、
+ * 見た目を作り込むことではない。依存を増やさず1ファイルに収める。
+ */
+
+:root {
+    --ink: #1c2430;
+    --ink-soft: #61707f;
+    --line: #d6dce3;
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --accent: #1f5f8b;
+    --danger: #a5372a;
+    --ok: #2c6247;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/*
+ * hidden 属性はブラウザ既定の display:none で効くが、同じ要素にクラスで display を
+ * 指定すると作者スタイルが勝ち、隠したはずの要素が出てしまう。表示の切り替えを
+ * hidden 属性に一本化するため、ここで優先させる。
+ */
+[hidden] {
+    display: none !important;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 24px;
+    background: var(--ink);
+    color: #fff;
+}
+
+.bar h1 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: .04em;
+}
+
+.who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.role {
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 2px;
+    padding: 0 7px;
+    font-size: 11px;
+    letter-spacing: .06em;
+}
+
+main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 18px 20px 22px;
+}
+
+.panel h2 {
+    margin: 0 0 14px;
+    font-size: 15px;
+}
+
+.panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.panel-head h2 {
+    margin: 0;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--ink-soft);
+}
+
+input,
+select {
+    font: inherit;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+}
+
+button {
+    font: inherit;
+    font-size: 13px;
+    padding: 5px 12px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+    filter: brightness(1.12);
+}
+
+button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+button.quiet {
+    background: #fff;
+    color: var(--accent);
+}
+
+.bar button {
+    border-color: rgba(255, 255, 255, .5);
+    background: transparent;
+}
+
+.login {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.hint {
+    margin: 14px 0 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+}
+
+code {
+    background: var(--bg);
+    padding: 1px 5px;
+    font-size: 12px;
+}
+
+.grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.grid th,
+.grid td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+}
+
+.grid thead th {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    border-bottom: 1px solid var(--ink-soft);
+    white-space: nowrap;
+}
+
+.grid .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.status {
+    font-size: 11px;
+    letter-spacing: .04em;
+    border: 1px solid var(--line);
+    padding: 1px 7px;
+    white-space: nowrap;
+}
+
+.status[data-status="NEW"] {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.status[data-status="SHIPPED"] {
+    border-color: var(--ok);
+    color: var(--ok);
+}
+
+.status[data-status="CANCELLED"],
+.status[data-status="RETURNED"] {
+    color: var(--ink-soft);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.actions .none {
+    color: var(--ink-soft);
+    font-size: 12px;
+}
+
+.empty {
+    margin: 16px 0 0;
+    color: var(--ink-soft);
+}
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    max-width: min(560px, calc(100vw - 32px));
+    padding: 10px 16px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 6px 24px -10px rgba(0, 0, 0, .6);
+}
+
+.toast[data-kind="error"] {
+    background: var(--danger);
+}
+
+.toast[data-kind="ok"] {
+    background: var(--ok);
+}

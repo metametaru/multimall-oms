@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>mini-oms</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="bar">
+    <h1>mini-oms</h1>
+    <div class="who" id="who" hidden>
+        <span id="who-name"></span>
+        <span class="role" id="who-role"></span>
+        <button type="button" id="logout">ログアウト</button>
+    </div>
+</header>
+
+<main>
+    <!-- ログイン -->
+    <section class="panel" id="login-panel">
+        <h2>ログイン</h2>
+        <form id="login-form" class="login">
+            <label>ユーザー名
+                <input type="text" id="username" value="operator" autocomplete="username" required>
+            </label>
+            <label>パスワード
+                <input type="password" id="password" value="operator-pass" autocomplete="current-password" required>
+            </label>
+            <button type="submit">ログイン</button>
+        </form>
+        <p class="hint">
+            デモ用: <code>operator</code> / <code>operator-pass</code>（操作できる）、
+            <code>viewer</code> / <code>viewer-pass</code>（参照のみ）
+        </p>
+    </section>
+
+    <!-- 業務画面 -->
+    <div id="work" hidden>
+        <section class="panel">
+            <div class="panel-head">
+                <h2>受注</h2>
+                <div class="filters">
+                    <label>ステータス
+                        <select id="filter-status">
+                            <option value="">すべて</option>
+                            <option value="NEW">NEW</option>
+                            <option value="CONFIRMED">CONFIRMED</option>
+                            <option value="SHIPPING_INSTRUCTED">SHIPPING_INSTRUCTED</option>
+                            <option value="SHIPPED">SHIPPED</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                            <option value="RETURNED">RETURNED</option>
+                        </select>
+                    </label>
+                    <label>モール
+                        <select id="filter-mall">
+                            <option value="">すべて</option>
+                            <option value="MALL_A">MALL_A</option>
+                            <option value="MALL_B">MALL_B</option>
+                        </select>
+                    </label>
+                    <button type="button" id="reload">再読み込み</button>
+                </div>
+            </div>
+
+            <table class="grid">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>モール</th>
+                    <th>注文番号</th>
+                    <th>顧客</th>
+                    <th class="num">金額</th>
+                    <th>ステータス</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody id="orders"></tbody>
+            </table>
+            <p class="empty" id="orders-empty" hidden>該当する受注がありません</p>
+        </section>
+
+        <section class="panel">
+            <h2>在庫</h2>
+            <table class="grid">
+                <thead>
+                <tr>
+                    <th>商品コード</th>
+                    <th class="num">実在庫</th>
+                    <th class="num">引当済</th>
+                    <th class="num">引当可能</th>
+                </tr>
+                </thead>
+                <tbody id="stocks"></tbody>
+            </table>
+        </section>
+    </div>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
