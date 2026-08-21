@@ -2,6 +2,7 @@ package com.minioms.infrastructure.config;
 
 import com.minioms.application.auth.AccessTokenIssuer;
 import com.minioms.application.auth.AuthenticateUserUseCase;
+import com.minioms.application.auth.LoginAttemptPolicy;
 import com.minioms.application.auth.PasswordHasher;
 import com.minioms.application.auth.UserRepository;
 import org.springframework.context.annotation.Bean;
@@ -17,7 +18,8 @@ class AuthUseCaseConfig {
     @Bean
     AuthenticateUserUseCase authenticateUserUseCase(UserRepository userRepository,
                                                     PasswordHasher passwordHasher,
-                                                    AccessTokenIssuer accessTokenIssuer) {
-        return new AuthenticateUserUseCase(userRepository, passwordHasher, accessTokenIssuer);
+                                                    AccessTokenIssuer accessTokenIssuer,
+                                                    LoginAttemptPolicy loginAttemptPolicy) {
+        return new AuthenticateUserUseCase(userRepository, passwordHasher, accessTokenIssuer, loginAttemptPolicy);
     }
 }

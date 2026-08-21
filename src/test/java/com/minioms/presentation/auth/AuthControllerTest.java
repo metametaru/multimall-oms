@@ -3,6 +3,7 @@ package com.minioms.presentation.auth;
 import com.minioms.application.auth.AccessToken;
 import com.minioms.application.auth.AuthenticateUserUseCase;
 import com.minioms.domain.user.InvalidCredentialsException;
+import com.minioms.domain.user.TooManyLoginAttemptsException;
 import com.minioms.domain.user.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Duration;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -79,6 +82,21 @@ class AuthControllerTest {
                                 {"username":"operator","password":"wrong-password"}"""))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("認証に失敗しました"));
+    }
+
+    @Test
+    void 試行回数の上限に達したら429を返す() throws Exception {
+        // Why: 401 にまとめない。401 は「入れ直せば通る」を意味するが、
+        // この状態は正しい資格情報でも通らない
+        willThrow(new TooManyLoginAttemptsException(Duration.ofMinutes(1)))
+                .given(authenticateUserUseCase).authenticate(any(), any());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"operator","password":"whatever"}"""))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.title").value("試行回数が多すぎます"));
     }
 
     @Test

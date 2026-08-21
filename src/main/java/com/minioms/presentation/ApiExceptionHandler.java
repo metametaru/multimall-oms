@@ -3,6 +3,7 @@ package com.minioms.presentation;
 import com.minioms.domain.DomainException;
 import com.minioms.domain.order.OrderNotFoundException;
 import com.minioms.domain.user.InvalidCredentialsException;
+import com.minioms.domain.user.TooManyLoginAttemptsException;
 import com.minioms.presentation.order.UnknownMallCodeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,16 @@ class ApiExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     ProblemDetail handleInvalidCredentials(InvalidCredentialsException e) {
         return problem(HttpStatus.UNAUTHORIZED, "認証に失敗しました", e.getMessage());
+    }
+
+    /**
+     * ログイン試行が多すぎる: 429。
+     * Why not: 401 にまとめない。401 は「入れ直せば通る」を意味するが、
+     * この状態は正しい資格情報でも通らない。同じ応答だと利用者はパスワードを疑い続ける。
+     */
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    ProblemDetail handleTooManyLoginAttempts(TooManyLoginAttemptsException e) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "試行回数が多すぎます", e.getMessage());
     }
 
     /** API入力の誤り: 400 */

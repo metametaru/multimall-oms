@@ -1,6 +1,7 @@
 package com.minioms.infrastructure.security;
 
 import com.minioms.application.auth.AccessTokenIssuer;
+import com.minioms.application.auth.LoginAttemptPolicy;
 import com.minioms.application.auth.PasswordHasher;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -37,7 +39,7 @@ import java.time.Clock;
  * 運用する対象が増えるだけで守れるものが増えない。</p>
  */
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, LoginAttemptProperties.class})
 class SecurityBeansConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityBeansConfig.class);
@@ -69,11 +71,18 @@ class SecurityBeansConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSigningKey));
     }
 
+    /**
+     * Why not: 既定の検証(署名と有効期限)だけで済ませない。発行時に {@code iss} を
+     * 載せている以上、検証しなければその主張は何も保証していないことになる。
+     * 鍵が他の用途にも使われた場合に、別の発行元のトークンをそのまま受け入れてしまう。
+     */
     @Bean
     JwtDecoder jwtDecoder(SecretKey jwtSigningKey) {
-        return NimbusJwtDecoder.withSecretKey(jwtSigningKey)
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSigningKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(JwtAccessTokenIssuer.ISSUER));
+        return decoder;
     }
 
     /**
@@ -96,6 +105,11 @@ class SecurityBeansConfig {
     @Bean
     AccessTokenIssuer accessTokenIssuer(JwtEncoder jwtEncoder, JwtProperties properties) {
         return new JwtAccessTokenIssuer(jwtEncoder, properties.ttl(), Clock.systemUTC());
+    }
+
+    @Bean
+    LoginAttemptPolicy loginAttemptPolicy(LoginAttemptProperties properties) {
+        return new LoginAttemptPolicy(properties.maxFailures(), properties.lockout(), Clock.systemUTC());
     }
 
     @Bean

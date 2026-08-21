@@ -254,9 +254,11 @@
     let toastTimer = null;
 
     function notify(message, kind = 'ok') {
-        dom.toast.textContent = message;
+        // hidden のままだと支援技術の対象外で、内容を変えても読み上げられない。
+        // 表示してから文言を入れる
         dom.toast.dataset.kind = kind;
         dom.toast.hidden = false;
+        dom.toast.textContent = message;
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => {
             dom.toast.hidden = true;

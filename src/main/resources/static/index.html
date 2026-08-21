@@ -63,13 +63,13 @@
             <table class="grid">
                 <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>モール</th>
-                    <th>注文番号</th>
-                    <th>顧客</th>
-                    <th class="num">金額</th>
-                    <th>ステータス</th>
-                    <th>操作</th>
+                    <th scope="col">ID</th>
+                    <th scope="col">モール</th>
+                    <th scope="col">注文番号</th>
+                    <th scope="col">顧客</th>
+                    <th scope="col" class="num">金額</th>
+                    <th scope="col">ステータス</th>
+                    <th scope="col">操作</th>
                 </tr>
                 </thead>
                 <tbody id="orders"></tbody>
@@ -82,10 +82,10 @@
             <table class="grid">
                 <thead>
                 <tr>
-                    <th>商品コード</th>
-                    <th class="num">実在庫</th>
-                    <th class="num">引当済</th>
-                    <th class="num">引当可能</th>
+                    <th scope="col">商品コード</th>
+                    <th scope="col" class="num">実在庫</th>
+                    <th scope="col" class="num">引当済</th>
+                    <th scope="col" class="num">引当可能</th>
                 </tr>
                 </thead>
                 <tbody id="stocks"></tbody>
@@ -94,7 +94,8 @@
     </div>
 </main>
 
-<div class="toast" id="toast" hidden></div>
+<!-- 操作の結果は視覚的な表示だけでなく支援技術にも伝える必要がある -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="/app.js"></script>
 </body>

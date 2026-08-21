@@ -1,6 +1,7 @@
 package com.minioms.presentation.security;
 
 import com.jayway.jsonpath.JsonPath;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.minioms.TestcontainersConfiguration;
 import com.minioms.application.auth.PasswordHasher;
 import com.minioms.application.auth.UserRepository;
@@ -17,7 +18,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+
+import javax.crypto.SecretKey;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -59,6 +70,10 @@ class ApiAuthorizationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** アプリが実際に署名に使っている鍵。偽装トークンを本物と同じ鍵で作るために借りる */
+    @Autowired
+    private SecretKey jwtSigningKey;
+
     @BeforeEach
     void 利用者を用意する() {
         jdbcTemplate.update("DELETE FROM users");
@@ -93,6 +108,30 @@ class ApiAuthorizationTest {
     void 改ざんされたトークンでは受注を参照できない() throws Exception {
         // 署名を検証しなければ、ロールを書き換えたトークンで権限を詐称できる
         mockMvc.perform(get("/api/orders").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-valid-token"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 署名が正しくても発行元が違うトークンは受け付けない() {
+        // Why: iss を載せているのに検証しなければ、その主張は何も保証していないことになる。
+        // 鍵が他の用途にも使われた場合に、別の発行元のトークンをそのまま受け入れてしまう
+        String 別発行元のトークン = 偽装トークン("someone-else", "OPERATOR");
+
+        org.assertj.core.api.Assertions.assertThatCode(() ->
+                mockMvc.perform(get("/api/orders").header(HttpHeaders.AUTHORIZATION, "Bearer " + 別発行元のトークン))
+                        .andExpect(status().isUnauthorized()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void 本物のトークンでも署名部を差し替えれば弾かれる() throws Exception {
+        // ヘッダとペイロードは本物のまま、署名だけを別の値にする。
+        // 署名を検証していなければ、ペイロードのロールを書き換えるだけで権限を詐称できる
+        String viewerToken = bearerFor("viewer", VIEWER_PASSWORD).substring("Bearer ".length());
+        String[] parts = viewerToken.split("\\.");
+
+        mockMvc.perform(get("/api/orders")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer %s.%s.%s".formatted(parts[0], parts[1], "tampered")))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -166,6 +205,22 @@ class ApiAuthorizationTest {
                 .getResponse()
                 .getContentAsString();
         return "Bearer " + JsonPath.read(body, "$.accessToken");
+    }
+
+    /** アプリの署名鍵で、発行元だけ差し替えたトークンを作る */
+    private String 偽装トークン(String issuer, String role) {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject("operator")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(3600))
+                .claim("roles", List.of(role))
+                .build();
+
+        return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSigningKey))
+                .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+                .getTokenValue();
     }
 
     private static org.springframework.test.web.servlet.RequestBuilder login(String username, String password) {

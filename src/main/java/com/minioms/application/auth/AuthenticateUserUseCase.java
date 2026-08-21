@@ -1,6 +1,7 @@
 package com.minioms.application.auth;
 
 import com.minioms.domain.user.InvalidCredentialsException;
+import com.minioms.domain.user.TooManyLoginAttemptsException;
 import com.minioms.domain.user.User;
 
 /**
@@ -20,24 +21,32 @@ public class AuthenticateUserUseCase {
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
     private final AccessTokenIssuer accessTokenIssuer;
+    private final LoginAttemptPolicy loginAttemptPolicy;
 
     public AuthenticateUserUseCase(UserRepository userRepository,
                                    PasswordHasher passwordHasher,
-                                   AccessTokenIssuer accessTokenIssuer) {
+                                   AccessTokenIssuer accessTokenIssuer,
+                                   LoginAttemptPolicy loginAttemptPolicy) {
         this.userRepository = userRepository;
         this.passwordHasher = passwordHasher;
         this.accessTokenIssuer = accessTokenIssuer;
+        this.loginAttemptPolicy = loginAttemptPolicy;
     }
 
     /**
      * 資格情報を検証してトークンを発行する。
      *
-     * @throws InvalidCredentialsException ユーザー名またはパスワードが一致しない場合
+     * @throws InvalidCredentialsException   ユーザー名またはパスワードが一致しない場合
+     * @throws TooManyLoginAttemptsException 失敗が続き、しばらく受け付けない状態の場合
      */
     public AccessToken authenticate(String username, String rawPassword) {
         if (isBlank(username) || isBlank(rawPassword)) {
             throw new InvalidCredentialsException();
         }
+
+        // ハッシュ化は意図的に遅いだけで、試行そのものを止めはしない。
+        // 時間をかければ通る状態を残さないよう、照合の前に回数で打ち切る
+        loginAttemptPolicy.verifyAccepting(username);
 
         User user = userRepository.findByUsername(username).orElse(null);
 
@@ -46,13 +55,16 @@ public class AuthenticateUserUseCase {
         // 空振りと分かっていてもダミーハッシュとの照合を通し、処理時間を揃える。
         if (user == null) {
             passwordHasher.matches(rawPassword, DUMMY_HASH);
+            loginAttemptPolicy.recordFailure(username);
             throw new InvalidCredentialsException();
         }
 
         if (!passwordHasher.matches(rawPassword, user.passwordHash())) {
+            loginAttemptPolicy.recordFailure(username);
             throw new InvalidCredentialsException();
         }
 
+        loginAttemptPolicy.recordSuccess(username);
         return accessTokenIssuer.issue(user);
     }
 
