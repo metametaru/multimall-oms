@@ -2,6 +2,7 @@ package com.minioms.presentation;
 
 import com.minioms.domain.DomainException;
 import com.minioms.domain.order.OrderNotFoundException;
+import com.minioms.domain.user.InvalidCredentialsException;
 import com.minioms.presentation.order.UnknownMallCodeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,16 @@ class ApiExceptionHandler {
     @ExceptionHandler(OrderNotFoundException.class)
     ProblemDetail handleOrderNotFound(OrderNotFoundException e) {
         return problem(HttpStatus.NOT_FOUND, "受注が見つかりません", e.getMessage());
+    }
+
+    /**
+     * 資格情報が一致しない: 401。
+     * Why not: 409 にしない。受注の状態と衝突しているのではなく、
+     * そもそも誰であるかを確認できていない状態であり、業務ルール違反とは別物。
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    ProblemDetail handleInvalidCredentials(InvalidCredentialsException e) {
+        return problem(HttpStatus.UNAUTHORIZED, "認証に失敗しました", e.getMessage());
     }
 
     /** API入力の誤り: 400 */
