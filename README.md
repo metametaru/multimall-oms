@@ -41,26 +41,54 @@ docker compose up -d      # PostgreSQL 16 を起動
 受注取込完了: 取込0件 スキップ3件 失敗0件 取得失敗モール[]   ← 2回目は冪等キーで全件スキップ
 ```
 
+### ログインする
+
+APIは認証が必要です。ローカルデモ用の利用者が起動時に作られます。
+
+| ユーザー名 | パスワード | ロール | できること |
+|---|---|---|---|
+| `operator` | `operator-pass` | OPERATOR | 参照 + 受注と在庫を動かす操作 |
+| `viewer` | `viewer-pass` | VIEWER | 参照のみ |
+
+```bash
+TOKEN=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"username":"operator","password":"operator-pass"}' \
+  | sed 's/.*"accessToken":"\([^"]*\)".*/\1/')
+```
+
+このアカウントは `mock` プロファイル(ローカル既定)でのみ作られます。
+
 ### 一連の業務フローを試す
 
 ```bash
 # 受注一覧(未確認のものを古い順に)
-curl "http://localhost:8080/api/orders?status=NEW"
+curl "http://localhost:8080/api/orders?status=NEW" -H "Authorization: Bearer $TOKEN"
 
 # 在庫の初期状態
-curl "http://localhost:8080/api/stocks"
+curl "http://localhost:8080/api/stocks" -H "Authorization: Bearer $TOKEN"
 
 # 確認 → 在庫が引き当てられる(実在庫は減らない)
 curl -X POST "http://localhost:8080/api/orders/1/confirmation" \
+     -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" -d '{"version":0}'
 
 # 出荷指示 → 在庫は動かない
 curl -X POST "http://localhost:8080/api/orders/1/shipping-instruction" \
+     -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" -d '{"version":1}'
 
 # 出荷完了 → 引当が実在庫から落ちる
 curl -X POST "http://localhost:8080/api/orders/1/shipment" \
+     -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" -d '{"version":2}'
+```
+
+`viewer` のトークンで更新系を叩くと、業務ロジックに届く前に弾かれます。
+
+```
+$ curl -X POST .../api/orders/1/confirmation -H "Authorization: Bearer $VIEWER_TOKEN" -d '{"version":0}'
+403 {"title":"権限がありません","detail":"この操作を行う権限がありません"}
 ```
 
 在庫の動きは `GET /api/stocks` で追えます。
@@ -112,18 +140,19 @@ stateDiagram-v2
 
 ### API
 
-| メソッド | パス | 用途 |
-|---|---|---|
-| GET | `/api/orders?status=&mallCode=&page=&size=` | 受注一覧(注文日時の古い順) |
-| GET | `/api/orders/{id}` | 受注詳細(明細つき) |
-| POST | `/api/orders/{id}/confirmation` | 確認(在庫引当) |
-| POST | `/api/orders/{id}/shipping-instruction` | 出荷指示 |
-| POST | `/api/orders/{id}/shipment` | 出荷完了(実在庫から落とす) |
-| POST | `/api/orders/{id}/cancellation` | キャンセル(引当解除) |
-| POST | `/api/orders/{id}/return` | 返品 |
-| GET | `/api/stocks` | 在庫一覧(実在庫・引当済・引当可能数) |
-| GET | `/mock/mall-a/orders` | モールAのモック(JSON) |
-| GET | `/mock/mall-b/orderList` | モールBのモック(XML) |
+| メソッド | パス | 用途 | 必要な権限 |
+|---|---|---|---|
+| POST | `/api/auth/login` | ログイン(アクセストークン発行) | 不要 |
+| GET | `/api/orders?status=&mallCode=&page=&size=` | 受注一覧(注文日時の古い順) | VIEWER / OPERATOR |
+| GET | `/api/orders/{id}` | 受注詳細(明細つき) | VIEWER / OPERATOR |
+| POST | `/api/orders/{id}/confirmation` | 確認(在庫引当) | OPERATOR |
+| POST | `/api/orders/{id}/shipping-instruction` | 出荷指示 | OPERATOR |
+| POST | `/api/orders/{id}/shipment` | 出荷完了(実在庫から落とす) | OPERATOR |
+| POST | `/api/orders/{id}/cancellation` | キャンセル(引当解除) | OPERATOR |
+| POST | `/api/orders/{id}/return` | 返品 | OPERATOR |
+| GET | `/api/stocks` | 在庫一覧(実在庫・引当済・引当可能数) | VIEWER / OPERATOR |
+| GET | `/mock/mall-a/orders` | モールAのモック(JSON) | 不要 |
+| GET | `/mock/mall-b/orderList` | モールBのモック(XML) | 不要 |
 
 更新系は対象受注の `version` を必須で受け取ります(後述)。
 
@@ -224,6 +253,39 @@ $ curl -X POST .../api/orders/2/confirmation -d '{"version":0}'
 参照用ポート(`OrderSearchQuery`)を更新用ポート(`OrderRepository`)と分け、
 読み書きの非対称を型として残しています。
 
+### 認証はトークン、認可はURLで判断する
+
+ログインAPIで資格情報を検証し、署名付きトークン(JWT)を発行します。以降のリクエストは
+トークンだけで認証され、サーバーはセッションを持ちません。
+
+| | 選択 | 理由 |
+|---|---|---|
+| 資格情報の運び方 | トークン(Bearer) | 毎リクエストでパスワードを送らずに済む。BCrypt照合はログイン時の1回だけ |
+| 署名 | 共通鍵(HS256) | 発行するのも検証するのもこのアプリ1つ。鍵を配る相手がいない |
+| 署名鍵の出どころ | 環境変数 | 未設定なら起動ごとに生成。リポジトリに鍵を残さない |
+| 失効 | 有効期限のみ(既定1時間) | 失効リストを持つとステートレスの前提が崩れ、検証のたびにDB参照が必要になる |
+
+トークンの発行と検証は自前で組まず、Spring Security(Nimbus)に任せています。
+手書きのJWT実装は `alg=none` の受理や期限の検証漏れといった穴を踏みやすく、
+**失敗しても認証が素通りするだけで気づけない**種類の不具合になるためです。
+
+ログアウトAPIは用意していません。サーバー側に状態を持たない以上、「失効させた」と
+応答しても実際には期限まで有効です。できないことをAPIとして見せる方が危険と判断し、
+代わりに寿命を短く保つ設定を明示しています。
+
+#### 認可はドメイン層に置かない
+
+権限は「見るだけの人(VIEWER)」と「動かす人(OPERATOR)」の1本の線だけです。
+このルールは `SecurityConfig` にあり、ドメイン層にはありません。
+
+| ルール | 置き場所 | なぜ |
+|---|---|---|
+| 出荷指示済みの受注はキャンセルできない | domain (`OrderStatus`) | 受注そのものの性質。誰が操作しても変わらない |
+| VIEWER はキャンセルAPIを叩けない | presentation (`SecurityConfig`) | 誰に操作を任せるかという運用の取り決め。組織で変わる |
+
+「業務ルールは必ず domain 層に置く」という方針を持っていますが、認可はそこに含めません。
+**変わる理由が違うものを同居させない**ためです。
+
 ### エラーの表現
 
 業務ルール違反は `DomainException` のサブクラスで表し、HTTPステータスへの変換は
@@ -233,10 +295,18 @@ presentation 層の1箇所(`ApiExceptionHandler`)に集約しています。
 | 状況 | ステータス |
 |---|---|
 | リクエストの形式・値が不正 | 400 |
+| 誰であるかを確認できない(トークンが無い・期限切れ・署名が不正・資格情報が誤り) | 401 |
+| 誰かは分かるが、その操作を任されていない | 403 |
 | 受注が存在しない | 404 |
 | 要求は正しいが受注の現在状態と衝突(不正な遷移・在庫不足・同時更新) | 409 |
 
 400と409を分けているのは、後者が**同じ要求でも状態次第で成功しうる**ためです。
+401と403を分けているのは、前者が**やり直せる**(ログインし直せばよい)のに対し、
+後者は**何度やっても通らない**ためです。
+
+セキュリティフィルタで弾かれた応答も同じ ProblemDetail 形式で返します。
+Spring Security の既定は本文が空で、クライアントがエラーの読み取り方を
+2通り持つことになるためです。
 
 ---
 
@@ -253,6 +323,10 @@ presentation 層の1箇所(`ApiExceptionHandler`)に集約しています。
 | infrastructure | **Testcontainers で実PostgreSQL**を使う |
 | presentation | `@WebMvcTest` でHTTP契約(ステータスコード・JSON)を固定 |
 
+認可のテストだけは認証をモックで差し替えず、ログインAPIから取った本物のトークンを使います。
+クレーム名や権限の接頭辞の食い違いは最も起きやすい設定ミスで、
+モックで代用すると**そこだけ素通りして本番で全員が弾かれる**からです。
+
 ### H2 での代用を禁止している理由
 
 インメモリDBは制約違反時の例外や型の丸めが実DBと異なり、
@@ -262,6 +336,7 @@ presentation 層の1箇所(`ApiExceptionHandler`)に集約しています。
 
 - ユニーク制約違反が `DataIntegrityViolationException` として上がること(冪等キー)
 - `CHECK` 制約が「引当済 > 実在庫」の在庫を拒否すること
+- `CHECK` 制約が未知のロールを拒否すること(綴り間違いが認可の穴にならない)
 - `TIMESTAMPTZ` / `NUMERIC` がJavaの型と往復すること
 - 在庫不足時に**トランザクションが実際に巻き戻る**こと
 
@@ -271,7 +346,7 @@ presentation 層の1箇所(`ApiExceptionHandler`)に集約しています。
 
 ## 技術スタック
 
-- Java 21 / Spring Boot 3.5(Web, Data JPA, Security, Validation)
+- Java 21 / Spring Boot 3.5(Web, Data JPA, Security, OAuth2 Resource Server, Validation)
 - PostgreSQL 16 + Flyway
 - Gradle (Kotlin DSL)
 - JUnit 5 / AssertJ / Testcontainers
@@ -286,13 +361,18 @@ presentation 層の1箇所(`ApiExceptionHandler`)に集約しています。
 - 受注のライフサイクル管理(確認・出荷指示・出荷完了・キャンセル・返品)
 - 在庫引当(引当・解除・出荷確定、悲観ロック、トランザクション境界)
 - 受注・在庫の参照API
+- 認証(JWT)と認可(OPERATOR / VIEWER の2ロール)
 
 未実装(今後):
 
-- **認証** — `SecurityConfig` は現在すべてのエンドポイントを開放しています。
-  Spring Security を後から追加するとフィルタ順序やCSRF・セッション方針の見直しが
-  広範囲に及ぶため、依存だけ最初から入れ、「意図的に開放している」ことをコードに残しています。
 - E2Eテスト(Playwright、主要フロー1本)
+
+スコープ外と決めたもの:
+
+- **利用者の登録・変更API** — 利用者管理はこのシステムの主題ではなく、
+  作れば権限昇格という別の攻撃面を抱え込みます。デモ用の利用者は起動時に投入しています。
+- **トークンの即時失効** — 失効リストを持つとステートレスの前提が崩れるため、
+  寿命を短く保つ割り切りを設定として明示しています。
 
 ---
 
