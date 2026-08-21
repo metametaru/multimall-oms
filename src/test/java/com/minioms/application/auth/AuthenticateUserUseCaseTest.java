@@ -134,7 +134,7 @@ class AuthenticateUserUseCaseTest {
         @Override
         public AccessToken issue(User user) {
             issuedFor.add(user);
-            return new AccessToken("token-for-" + user.username(), 3600L);
+            return new AccessToken("token-for-" + user.username(), 3600L, user.role());
         }
     }
 }

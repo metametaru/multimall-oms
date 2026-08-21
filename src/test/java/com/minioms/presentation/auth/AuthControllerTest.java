@@ -3,6 +3,7 @@ package com.minioms.presentation.auth;
 import com.minioms.application.auth.AccessToken;
 import com.minioms.application.auth.AuthenticateUserUseCase;
 import com.minioms.domain.user.InvalidCredentialsException;
+import com.minioms.domain.user.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,7 @@ class AuthControllerTest {
     @Test
     void 認証に成功するとトークンと有効期限を返す() throws Exception {
         given(authenticateUserUseCase.authenticate("operator", "correct-password"))
-                .willReturn(new AccessToken("issued-token", 3600L));
+                .willReturn(new AccessToken("issued-token", 3600L, Role.OPERATOR));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -48,7 +49,23 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("issued-token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").value(3600));
+                .andExpect(jsonPath("$.expiresIn").value(3600))
+                .andExpect(jsonPath("$.role").value("OPERATOR"));
+    }
+
+    @Test
+    void 認証された利用者の権限を応答に含める() throws Exception {
+        // Why: 画面がトークンを復号して権限を読む形にすると、画面が自分の権限を
+        // 自称する経路になる。出どころをサーバーの応答に一本化する
+        given(authenticateUserUseCase.authenticate("viewer", "viewer-password"))
+                .willReturn(new AccessToken("issued-token", 3600L, Role.VIEWER));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"viewer","password":"viewer-password"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("VIEWER"));
     }
 
     @Test
@@ -67,7 +84,7 @@ class AuthControllerTest {
     @Test
     void 応答にパスワードを含めない() throws Exception {
         given(authenticateUserUseCase.authenticate(any(), any()))
-                .willReturn(new AccessToken("issued-token", 3600L));
+                .willReturn(new AccessToken("issued-token", 3600L, Role.OPERATOR));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

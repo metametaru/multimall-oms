@@ -1,5 +1,7 @@
 package com.minioms.application.auth;
 
+import com.minioms.domain.user.Role;
+
 /**
  * 発行済みのアクセストークン。
  *
@@ -9,6 +11,7 @@ package com.minioms.application.auth;
  *
  * @param value            署名済みトークン文字列
  * @param expiresInSeconds 発行時点から失効までの秒数
+ * @param role             認証された利用者の権限。画面の出し分けにだけ使う
  */
-public record AccessToken(String value, long expiresInSeconds) {
+public record AccessToken(String value, long expiresInSeconds, Role role) {
 }

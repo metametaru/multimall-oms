@@ -64,6 +64,6 @@ class JwtAccessTokenIssuer implements AccessTokenIssuer {
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String value = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 
-        return new AccessToken(value, ttl.toSeconds());
+        return new AccessToken(value, ttl.toSeconds(), user.role());
     }
 }
