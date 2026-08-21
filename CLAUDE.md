@@ -8,7 +8,7 @@
 - Java 21 / Spring Boot 3.x(Web, Data JPA, Security, Validation)
 - PostgreSQL 16 + Flyway
 - Gradle (Kotlin DSL)
-- テスト: JUnit 5 + Testcontainers + Playwright(E2E 主要フロー1本)
+- テスト: JUnit 5 + Testcontainers(E2E は実サーバを起動して主要フロー1本)
 - Docker Compose で `docker compose up` 一発起動
 
 ## 文書哲学(このリポジトリの最重要ルール)
