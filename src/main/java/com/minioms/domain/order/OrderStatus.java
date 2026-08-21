@@ -45,6 +45,20 @@ public enum OrderStatus {
     }
 
     /**
+     * このステータスから進める先の一覧。
+     *
+     * <p>画面が「いま押せる操作」を組み立てるために使う。画面側が
+     * 「NEWなら確認とキャンセル」という対応表を持つと遷移ルールが二重化し、
+     * 遷移を1本追加したときに画面だけ古いままになる。</p>
+     *
+     * <p>Why not: 変更可能な Set を返さない。呼び出し側が受け取った集合を書き換えると、
+     * 状態機械そのものが壊れる(全ての受注の遷移ルールが変わる)。</p>
+     */
+    public Set<OrderStatus> allowedTransitions() {
+        return Set.copyOf(ALLOWED_TRANSITIONS.get(this));
+    }
+
+    /**
      * 遷移を実行する。不正な遷移は業務例外として弾く。
      *
      * @throws InvalidStatusTransitionException 許可されていない遷移の場合

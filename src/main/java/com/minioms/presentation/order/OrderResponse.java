@@ -22,7 +22,8 @@ record OrderResponse(
         BigDecimal itemsSubtotal,
         OffsetDateTime orderedAt,
         List<OrderItemResponse> items,
-        long version) {
+        long version,
+        List<OrderActionResponse> availableActions) {
 
     static OrderResponse from(Order order, String mallCode) {
         return new OrderResponse(
@@ -37,6 +38,7 @@ record OrderResponse(
                 order.itemsSubtotal(),
                 order.orderedAt(),
                 order.items().stream().map(OrderItemResponse::from).toList(),
-                order.version());
+                order.version(),
+                OrderAction.availableFrom(order.status()));
     }
 }

@@ -5,12 +5,16 @@ import com.minioms.domain.order.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 受注一覧の1行。
  *
  * <p>Why not: 明細は含めない。一覧で全件分の明細を返すと、画面が使わない
  * データのために応答が肥大する。明細が要るのは詳細画面だけ。</p>
+ *
+ * <p>一方で「いま行える操作」は一覧に含める。一覧はオペレーターの主画面であり、
+ * 操作のたびに詳細を開かせると業務が回らない。</p>
  */
 record OrderSummaryResponse(
         long id,
@@ -20,11 +24,13 @@ record OrderSummaryResponse(
         String customerName,
         BigDecimal totalAmount,
         OffsetDateTime orderedAt,
-        long version) {
+        long version,
+        List<OrderActionResponse> availableActions) {
 
     static OrderSummaryResponse from(OrderSummary summary, String mallCode) {
         return new OrderSummaryResponse(
                 summary.id(), mallCode, summary.mallOrderNumber(), summary.status(),
-                summary.customerName(), summary.totalAmount(), summary.orderedAt(), summary.version());
+                summary.customerName(), summary.totalAmount(), summary.orderedAt(), summary.version(),
+                OrderAction.availableFrom(summary.status()));
     }
 }

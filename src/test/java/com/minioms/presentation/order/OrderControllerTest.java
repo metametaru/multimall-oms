@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -46,9 +48,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * ここで固定するのは業務ルールそのものではなく、業務ルール違反や不正な入力が
  * どのHTTPステータスで表現されるかという契約。</p>
  *
- * <p>Why not: 認証は掛けずにテストする。第3週の認証実装まで SecurityConfig は
- * 全開放であり、ここに認証を含めると本実装への差し替え時にAPI契約のテストまで
- * 巻き添えで壊れるため。</p>
+ * <p>Why not: 認証・認可はここでは掛けない({@code addFilters = false})。
+ * 誰が叩けるかは受注APIの契約ではなく運用の取り決めで、変わる理由が違う。
+ * 混ぜると認可のルールを変えるたびにAPI契約のテストまで書き換えることになる。
+ * 認可そのものは {@code ApiAuthorizationTest} が本物のトークンで確認している。</p>
  */
 @DisplayName("受注API")
 @WebMvcTest(OrderController.class)
@@ -194,6 +197,56 @@ class OrderControllerTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.title").value("受注が見つかりません"))
                     .andExpect(jsonPath("$.detail").value("受注が存在しません: id=999"));
+        }
+    }
+
+    @Nested
+    @DisplayName("いま行える操作")
+    class いま行える操作 {
+
+        @Test
+        void 現在のステータスから進める操作を受注ごとに返す() throws Exception {
+            // 画面が「NEWなら確認とキャンセル」という対応表を持つと遷移ルールが二重化する。
+            // 押せる操作はサーバーが決め、画面はそれを描くだけにする
+            given(findOrdersUseCase.findById(10L)).willReturn(order(OrderStatus.NEW));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(get("/api/orders/10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.availableActions[*].operation")
+                            .value(containsInAnyOrder("confirmation", "cancellation")));
+        }
+
+        @Test
+        void 出荷指示済の受注にキャンセルは出てこない() throws Exception {
+            // 倉庫でピッキングが走っている可能性があるため、押せてはいけない
+            given(findOrdersUseCase.findById(10L)).willReturn(order(OrderStatus.SHIPPING_INSTRUCTED));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(get("/api/orders/10"))
+                    .andExpect(jsonPath("$.availableActions[*].operation").value(contains("shipment")));
+        }
+
+        @Test
+        void 終端の受注には行える操作が無い() throws Exception {
+            given(findOrdersUseCase.findById(10L)).willReturn(order(OrderStatus.CANCELLED));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(get("/api/orders/10"))
+                    .andExpect(jsonPath("$.availableActions").isEmpty());
+        }
+
+        @Test
+        void 一覧の各行にも行える操作を返す() throws Exception {
+            // 一覧はオペレーターの主画面で、操作のたびに詳細を開かせると業務が回らない
+            given(findOrdersUseCase.search(any()))
+                    .willReturn(new OrderSearchResult(List.of(summary(1L, OrderStatus.NEW)), 1));
+            given(mallDirectory.codeOf(anyLong())).willReturn(Optional.of("MALL_A"));
+
+            mockMvc.perform(get("/api/orders"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.orders[0].availableActions[*].operation")
+                            .value(containsInAnyOrder("confirmation", "cancellation")));
         }
     }
 

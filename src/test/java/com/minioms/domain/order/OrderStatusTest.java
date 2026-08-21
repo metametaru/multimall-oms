@@ -134,6 +134,35 @@ class OrderStatusTest {
     }
 
     @Nested
+    @DisplayName("進める先の一覧")
+    class 進める先の一覧 {
+
+        @Test
+        void 各ステータスから進める先を列挙できる() {
+            // 画面はこの一覧から操作ボタンを組み立てる。遷移ルールを画面側に複製させないため
+            assertThat(NEW.allowedTransitions()).containsExactlyInAnyOrder(CONFIRMED, CANCELLED);
+            assertThat(CONFIRMED.allowedTransitions()).containsExactlyInAnyOrder(SHIPPING_INSTRUCTED, CANCELLED);
+            assertThat(SHIPPING_INSTRUCTED.allowedTransitions()).containsExactly(SHIPPED);
+            assertThat(SHIPPED.allowedTransitions()).containsExactly(RETURNED);
+        }
+
+        @Test
+        void 終端ステータスから進める先は無い() {
+            assertThat(CANCELLED.allowedTransitions()).isEmpty();
+            assertThat(RETURNED.allowedTransitions()).isEmpty();
+        }
+
+        @Test
+        void 進める先の一覧を書き換えても状態機械は壊れない() {
+            // 変更可能な集合を返すと、呼び出し側の書き換えが全受注の遷移ルールを変えてしまう
+            assertThatThrownBy(() -> NEW.allowedTransitions().add(SHIPPED))
+                    .isInstanceOf(UnsupportedOperationException.class);
+
+            assertThat(NEW.canTransitionTo(SHIPPED)).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("不正な遷移の防止")
     class 不正な遷移の防止 {
 
