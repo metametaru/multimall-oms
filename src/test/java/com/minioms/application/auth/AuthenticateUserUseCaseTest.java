@@ -1,8 +1,8 @@
 package com.minioms.application.auth;
 
 import com.minioms.domain.user.InvalidCredentialsException;
-import com.minioms.domain.user.TooManyLoginAttemptsException;
 import com.minioms.domain.user.Role;
+import com.minioms.domain.user.TooManyLoginAttemptsException;
 import com.minioms.domain.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
