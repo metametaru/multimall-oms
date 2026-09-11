@@ -16,21 +16,25 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: JDK 21 を用意する
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
 
+      # Why not: setup-gradle だけ v6 に上げない。v6 はキャッシュ機能を
+      # クローズドソースの gradle-actions-caching に切り出しており、upgrade した時点で
+      # Gradle 社の利用規約に同意したことになる。公開リポジトリで暗黙の規約同意を
+      # 抱えたくない。v5 は Node 24 対応済みで、ランタイム削除の期限はこれで足りる
       - name: Gradle を用意する
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       # Why: ブラウザ本体は毎回取得すると1分近くかかる。Playwright のバージョンを
       # 鍵にして、build.gradle.kts が変わったときだけ取り直す
       - name: Chromium をキャッシュから復元する
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('build.gradle.kts') }}
@@ -42,7 +46,7 @@ jobs:
 
       - name: 失敗したテストのレポートを残す
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report
           path: build/reports/tests/test
