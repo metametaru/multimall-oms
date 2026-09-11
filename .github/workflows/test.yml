@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: JUnit / Testcontainers / Playwright
+    name: spotless / JUnit / Testcontainers / Playwright
     # Testcontainers が実PostgreSQLを、Playwright が Chromium を起動する。
     # どちらも動く環境として Docker 同梱の ubuntu を使う
     runs-on: ubuntu-latest
@@ -41,8 +41,11 @@ jobs:
 
       # -PplaywrightWithDeps: 素のUbuntuにはブラウザが依存する共有ライブラリが無いため、
       # CI に限って OS 側の依存も入れる(ローカルでは sudo を要求するので既定では付けない)
-      - name: テストを実行する
-        run: ./gradlew test -PplaywrightWithDeps
+      # Why not: spotlessCheck を独立したステップにしない。Gradle の起動がもう一度走る分だけ
+      # CI が遅くなる。整形違反で止まるとテスト結果が見られなくなるが、違反は spotlessApply で
+      # 即座に直せるため、早く落として直し直す方が結果的に待ち時間は短い
+      - name: 整形を検証してテストを実行する
+        run: ./gradlew spotlessCheck test -PplaywrightWithDeps
 
       - name: 失敗したテストのレポートを残す
         if: failure()
