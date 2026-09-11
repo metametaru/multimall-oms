@@ -6,6 +6,7 @@ plugins {
     java
     id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
+    id("com.diffplug.spotless") version "8.10.2"
 }
 
 group = "com.minioms"
@@ -72,4 +73,28 @@ tasks.withType<Test> {
     dependsOn(installPlaywrightBrowser)
     // 取得は上のタスクが担うため、テスト実行時の自動取得は止める
     environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+}
+
+// Why not: google-java-format や palantir-java-format のような全面フォーマッタは入れない。
+// このコードベースは整形そのものに意味を持たせている箇所があり、機械的な再配置で失われる。
+//   - OrderStatus の ALLOWED_TRANSITIONS は列を揃えて「どこからどこへ遷移できるか」を一覧させている
+//   - 日本語のコメントは、文節の切れ目で折り返して読ませている(全面フォーマッタは行長だけで折る)
+// 整形の基準が要るのは「議論にならない部分」だけなので、未使用importの除去や
+// 末尾空白のように、誰も異議を唱えない規則に絞る。
+spotless {
+    java {
+        target("src/*/java/**/*.java")
+        // 既存の並び(その他 → 空行 → java/javax → 空行 → static)に合わせる。
+        // "\#" は static import のグループを指す
+        importOrder("", "java|javax", "\\#")
+        removeUnusedImports()
+        formatAnnotations()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    kotlinGradle {
+        target("*.gradle.kts")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }

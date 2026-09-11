@@ -1,3 +1,10 @@
+# 改行コードはワークツリーでも LF に固定する。
+# Why not: 各自の core.autocrlf に委ねない。設定が人によって違うと、中身が同じなのに
+# 改行だけ変わったファイルが差分に現れる。spotless の判定も、ローカル(Windows)では CRLF、
+# CI(Linux)では LF を期待することになり、手元で通った整形が CI で落ちる。
+* text=auto eol=lf
+
 /gradlew text eol=lf
+# Windows のバッチファイルは CRLF でないと解釈されない
 *.bat text eol=crlf
 *.jar binary
