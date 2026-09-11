@@ -167,7 +167,7 @@ class OrderFlowEndToEndTest {
 
         assertThat(page.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(page.getBody())
-                .contains("<title>mini-oms</title>")
+                .contains("<title>multimall-oms</title>")
                 .doesNotContain(MALL_B_ORDER_NUMBER)
                 .doesNotContain(PRODUCT_CODE);
     }
