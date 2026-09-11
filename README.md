@@ -7,6 +7,46 @@
 
 ---
 
+## 想定している利用状況
+
+実運用のシステムではないため、以下は**設計の前提として置いた想定**です。
+テーブル設計・インデックス・トランザクション境界・排他制御は、この想定から逆算しています。
+
+### 誰が使うか
+
+| 利用者 | 使い方 | 同時に触る人数 |
+|---|---|---|
+| 受注オペレーター | 画面で受注を確認し、出荷指示・キャンセルを進める | 5〜15人 |
+| 取込バッチ | 無人。各モールAPIを定期的に叩いて新規受注を取り込む | — |
+| 参照のみの利用者(VIEWER) | 受注と在庫の状況を見る | 数人 |
+
+### どれくらいの量を捌くか
+
+| 項目 | 想定値 | この値が効いている設計 |
+|---|---|---|
+| 接続モール数 | 2(モールA=JSON / モールB=XML) | クライアントをポートで抽象化し、実装を足すだけで増やせる形 |
+| 受注件数 | 1日あたり合計 1,000〜5,000件。セール期はその数倍 | 一覧は必ずページング。集約を復元しない参照系を別に用意 |
+| 受注明細 | 1受注あたり平均2〜3行 | 明細は `@EntityGraph` で一括取得(N+1を作らない) |
+| 蓄積 | 年間 50万〜200万件、数年で数百万行規模 | `(status, ordered_at)` の複合インデックスで一覧の走査を抑える |
+| 取込間隔 | 1分ごと。1時間分を遡って取得 | 取りこぼしより重複を選ぶ。重複は冪等キーで弾く |
+| API 呼び出し | 社内利用のため数RPS程度 | 性能より整合性を優先(在庫更新は悲観ロック) |
+
+### 破ってはいけない条件
+
+- **同じモール注文を二重に取り込まない** — `(mall_id, mall_order_number)` のユニーク制約が最終防衛線。バッチが多重起動しても成立する
+- **引当は実在庫を超えない** — `quantity_allocated <= quantity_on_hand` を DB の CHECK 制約でも守る
+- **2人が同じ受注を同時に操作しても、後勝ちで黙って上書きしない** — 画面が見ていた `version` を必須で受け取り、食い違えば 409 で弾く
+- **受注の状態と在庫は片方だけ成立してはいけない** — 同一トランザクションで反映する
+- **参照系も含め、すべての API に認証が必要** — ロールは OPERATOR / VIEWER の2つ
+
+### 意図的に持たない前提
+
+単一インスタンスでの稼働を前提にしています。スケジューラの分散ロック、監視・アラート、
+可用性設計、監査ログ、多通貨対応は持っていません。
+在庫の同時更新は DB の行ロックで直列化しており、スループットより整合性を優先した割り切りです。
+
+---
+
 ## このリポジトリの読み方
 
 設計意図を4つの場所に分けて書いています。
@@ -164,6 +204,108 @@ stateDiagram-v2
 | GET | `/` | オペレーター画面(静的ファイル) | 不要 |
 
 更新系は対象受注の `version` を必須で受け取ります(後述)。
+
+---
+
+## システム構成
+
+```mermaid
+flowchart LR
+    browser["オペレーター画面<br/>(html/css/js 各1枚)"]
+
+    subgraph boot["Spring Boot アプリケーション"]
+        direction TB
+        pres["presentation<br/>REST API・JWT検証・例外→HTTP変換"]
+        app["application<br/>ユースケース・ポート定義"]
+        dom["domain<br/>状態機械・在庫の不変条件"]
+        infra["infrastructure<br/>JPA実装・モールクライアント・スケジューラ"]
+
+        pres --> app
+        app --> dom
+        infra -. "ポートを実装" .-> app
+    end
+
+    sched["取込スケジューラ<br/>1分間隔"]
+    mock["モックモールAPI<br/>A: JSON / B: XML+独自コード"]
+    db[("PostgreSQL 16<br/>スキーマは Flyway が管理")]
+
+    browser -- "JWT を Authorization ヘッダで" --> pres
+    sched --> infra
+    infra -- "HTTP" --> mock
+    infra -- "JDBC" --> db
+```
+
+**この図の前提**
+
+- モールAPIは `mock` プロファイルで**同一プロセス内に同居**します(`/mock/mall-a`, `/mock/mall-b`)。実モールに繋ぐ場合は設定のベースURLを差し替え、`MallOrderClient` の実装を追加するだけで済む形にしています
+- 画面はビルド環境を持たない静的ファイル3枚です。認証済みの API を叩くだけで、業務ルールは持ちません
+- JWT の署名鍵は環境変数から注入します。未設定なら起動ごとにランダム生成され、再起動で既存トークンは無効になります
+- スケジューラは単一インスタンス前提です。多重起動しても二重取込にならないことは、DB のユニーク制約で担保しています
+
+---
+
+## データ設計
+
+```mermaid
+erDiagram
+    malls ||--o{ orders : "受注元"
+    orders ||--|{ order_items : "明細を持つ"
+    order_items }o..o| stocks : "product_code で対応(FKなし)"
+
+    malls {
+        bigint id PK
+        varchar code UK "MALL_A / MALL_B"
+        varchar name
+    }
+    orders {
+        bigint id PK
+        bigint mall_id FK
+        varchar mall_order_number "モール側の注文番号"
+        varchar status "OrderStatus の enum 名"
+        varchar customer_name
+        numeric total_amount "日本円前提で小数なし"
+        timestamptz ordered_at "モール側の注文日時"
+        timestamptz imported_at "取込日時(取込遅延の監視用)"
+        bigint version "楽観ロック"
+    }
+    order_items {
+        bigint id PK
+        bigint order_id FK
+        varchar product_code
+        varchar product_name
+        numeric unit_price
+        int quantity "CHECK quantity > 0"
+    }
+    stocks {
+        bigint id PK
+        varchar product_code UK
+        int quantity_on_hand "実在庫"
+        int quantity_allocated "引当済"
+        bigint version
+    }
+    users {
+        bigint id PK
+        varchar username UK
+        varchar password_hash "BCrypt。平文は保存しない"
+        varchar role "CHECK OPERATOR / VIEWER"
+    }
+```
+
+### 制約とインデックスの狙い
+
+| 対象 | 種別 | 狙い |
+|---|---|---|
+| `orders (mall_id, mall_order_number)` | UNIQUE | 冪等キー。バッチが多重起動しても二重取込にならない。取込処理はこの制約違反を「スキップ(正常系)」として扱う |
+| `orders (status, ordered_at)` | INDEX | 「未確認の受注を古い順に処理する」という主画面のアクセスパターンに合わせた複合。`status` 単独では並び替えが効かない |
+| `order_items (order_id)` | INDEX | PostgreSQL は FK に自動でインデックスを張らないため明示。受注詳細の明細取得用 |
+| `stocks.product_code` | UNIQUE | 引当は「商品コードで1行引いて更新する」アクセスしかないため、付随インデックスで足りる(追加は張らない) |
+| `stocks` の数量 | CHECK | `0 <= quantity_allocated <= quantity_on_hand`。同じ不変条件をドメインでも守るが、手作業の SQL で壊れた在庫が入ると原因特定が極端に難しくなるため二重に守る |
+| `users.role` | CHECK | enum と同じ集合を DB 側でも固定し、綴り間違いが静かな認可の穴にならないようにする |
+
+**商品マスタを作っていない理由** — 商品の名称と価格は受注ごとにモールから送られてきます。
+OMS が持つべきなのは「引当可能かどうか」だけで、マスタを持つと同じ情報の二重管理になります。
+そのため `stocks` は `order_items` と外部キーで結ばず、`product_code` で論理的に対応させています
+(モール側にしか存在しない商品が受注に混ざっても、取込自体は失敗しません)。
 
 ---
 
