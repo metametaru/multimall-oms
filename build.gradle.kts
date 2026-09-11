@@ -75,6 +75,24 @@ tasks.withType<Test> {
     environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
 }
 
+// Why not: 性能計測を通常の test に含めない。1万件の保存に数十秒かかり、
+// 毎回のCIに載せると、得られる情報の量に対して待ち時間が見合わない。
+// 計測は結果を README に記録する行為であって、回帰を検出する仕組みではない
+tasks.named<Test>("test") {
+    useJUnitPlatform { excludeTags("perf") }
+}
+
+val perfTest by tasks.registering(Test::class) {
+    description = "性能を計測する(通常の test からは除外している)"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("perf") }
+    // 計測結果を標準出力で読みたい
+    testLogging { showStandardStreams = true }
+    outputs.upToDateWhen { false }
+}
+
 // Why not: google-java-format や palantir-java-format のような全面フォーマッタは入れない。
 // このコードベースは整形そのものに意味を持たせている箇所があり、機械的な再配置で失われる。
 //   - OrderStatus の ALLOWED_TRANSITIONS は列を揃えて「どこからどこへ遷移できるか」を一覧させている
