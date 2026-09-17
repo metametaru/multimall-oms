@@ -35,6 +35,9 @@ class MallOrderClientIntegrationTest {
     @Autowired
     private MallCatalog mallCatalog;
 
+    @Autowired
+    private MallProperties mallProperties;
+
     /** モックは絞り込みをしないため、渡す値は結果に影響しない */
     private static final OffsetDateTime SINCE = OffsetDateTime.parse("2026-08-01T00:00:00+09:00");
 
@@ -48,7 +51,7 @@ class MallOrderClientIntegrationTest {
 
         private List<Order> fetch() {
             return new MallAOrderClient(
-                    MallClientConfig.mallARestClient(mockUrl("mall-a")), mallCatalog)
+                    MallClientConfig.mallARestClient(mockUrl("mall-a"), mallProperties.timeout()), mallCatalog)
                     .fetchOrdersPlacedSince(SINCE);
         }
 
@@ -89,7 +92,7 @@ class MallOrderClientIntegrationTest {
 
         private List<Order> fetch() {
             return new MallBOrderClient(
-                    MallClientConfig.mallBRestClient(mockUrl("mall-b")), mallCatalog)
+                    MallClientConfig.mallBRestClient(mockUrl("mall-b"), mallProperties.timeout()), mallCatalog)
                     .fetchOrdersPlacedSince(SINCE);
         }
 
