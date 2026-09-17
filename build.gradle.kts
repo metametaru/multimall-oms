@@ -50,6 +50,8 @@ dependencies {
     testImplementation("org.testcontainers:postgresql")
     // 画面E2E。ブラウザ本体は初回実行時に取得される
     testImplementation("com.microsoft.playwright:playwright:1.62.0")
+    // 層の依存ルールをテストで固定する(LayerRuleTest)
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
