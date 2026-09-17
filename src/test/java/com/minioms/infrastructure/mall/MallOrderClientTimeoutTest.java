@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +67,8 @@ class MallOrderClientTimeoutTest {
 
     @AfterEach
     void 片付ける() {
+        // countDown が先。ハンドラは既定のディスパッチャスレッドで動くので、
+        // 解放しないまま stop すると応答待ちのスレッドが残る
         終了.countDown();
         無応答モール.stop(0);
     }
@@ -93,17 +96,39 @@ class MallOrderClientTimeoutTest {
     /**
      * タイムアウトの既定値は設定ファイルではなく型が持つ。
      * 設定を書き忘れた環境で無制限に戻ることが、この仕組みの唯一の抜け道になるため。
+     *
+     * <p>Why not: 「0 より大きい」だけを見ない。それだと既定を 1ms に変えても通ってしまう。
+     * 実際の値を置いて、変更が MallProperties.Timeouts の根拠(全モールの一巡が
+     * 取込間隔に収まる)を読み直す合図になるようにする。</p>
      */
     @Test
     void 設定を書かなくてもタイムアウトは入っている() {
-        MallProperties bound = new Binder(new MapConfigurationPropertySource(Map.of(
-                        "minioms.mall.mall-a-base-url", "http://mall-a.invalid",
-                        "minioms.mall.mall-b-base-url", "http://mall-b.invalid")))
+        MallProperties bound = bind(Map.of());
+
+        assertThat(bound.timeout().connect()).isEqualTo(Duration.ofSeconds(3));
+        assertThat(bound.timeout().read()).isEqualTo(Duration.ofSeconds(10));
+    }
+
+    /**
+     * 片方だけ設定する運用は現実に起きる(読取だけ延ばしたい等)。
+     * その時に書かなかった側が無制限に戻らないことを確かめる。
+     */
+    @Test
+    void 片方だけ設定しても書かなかった側は既定のままになる() {
+        MallProperties bound = bind(Map.of("minioms.mall.timeout.read", "30s"));
+
+        assertThat(bound.timeout().read()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(bound.timeout().connect()).isEqualTo(Duration.ofSeconds(3));
+    }
+
+    private static MallProperties bind(Map<String, String> 設定) {
+        Map<String, Object> source = new HashMap<>(設定);
+        source.put("minioms.mall.mall-a-base-url", "http://mall-a.invalid");
+        source.put("minioms.mall.mall-b-base-url", "http://mall-b.invalid");
+
+        return new Binder(new MapConfigurationPropertySource(source))
                 .bind("minioms.mall", MallProperties.class)
                 .get();
-
-        assertThat(bound.timeout().connect()).isPositive();
-        assertThat(bound.timeout().read()).isPositive();
     }
 
     private String 無応答モールのURL() {
